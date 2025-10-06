@@ -98,7 +98,18 @@
           </div>
         </div>
         <div class="row" style="justify-content:space-between"><span>Base</span><b id="base">$0</b></div>
-        <div class="row" style="justify-content:space-between"><span>IVA <span id="ivaLbl"></span></span><b id="ivaMonto">$0</b></div>
+        function calc(){
+  const n = state.nota;
+  const subtotal = (n.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
+  const desc = subtotal * (Number(n.descuentoPorc||0)/100);
+  const total = Math.max(0, subtotal - desc);
+
+  $('subtotal').textContent = mxn.format(subtotal);
+  $('descMonto').textContent = mxn.format(desc);
+  $('base').textContent = mxn.format(total);
+  $('total').textContent = mxn.format(total);
+}
+
         <div class="row total" style="justify-content:space-between"><span>Total</span><b id="total">$0</b></div>
       </div>
     </div>
