@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Notas TMP Regenerative</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#00b5ad">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="./icons/icon-512.png">
-  <meta name="apple-mobile-web-app-title" content="Notas TMP">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#00b5ad" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-512.png" />
+  <meta name="apple-mobile-web-app-title" content="Notas TMP" />
   <style>
     :root{--c:#00b5ad}
     body{font-family:system-ui,sans-serif;background:#f8fafc;color:#222;margin:0;padding:16px}
@@ -30,16 +30,19 @@
     .admin-list .row{justify-content:space-between;padding:6px 0;border-bottom:1px solid #eef2f6}
     .admin-list .row:last-child{border-bottom:none}
     .muted{color:#6b7785;font-size:12px}
-    @media print{#acciones,.no-print,.admin{display:none!important}body{background:#fff}.card{box-shadow:none}}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;font-size:14px}
+    th{background:#f3f6f9}
+    @media print{#acciones,.no-print,.admin,#historialCard{display:none!important}body{background:#fff}.card{box-shadow:none}}
   </style>
 </head>
 <body>
-
   <h1>Notas de Remisión TMP Regenerative</h1>
 
   <div id="acciones" class="actions">
     <button onclick="guardarHistorial()">💾 Guardar / Nuevo folio</button>
     <button onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="secondary" onclick="toggleHistorial()">📜 Ver historial</button>
   </div>
 
   <!-- SINCRONIZACIÓN -->
@@ -58,6 +61,27 @@
       </div>
     </div>
     <div class="muted" id="syncStatus" style="margin-top:6px">Estado: sin sincronizar</div>
+  </div>
+
+  <!-- HISTORIAL (listar / buscar / borrar) -->
+  <div id="historialCard" class="card no-print" style="display:none">
+    <div class="row between">
+      <h3 style="margin:6px 0">Historial de notas</h3>
+      <div class="row">
+        <input id="buscaHist" placeholder="Buscar por folio o cliente" oninput="renderHistorial()"
+               style="width:220px" />
+        <button class="danger" onclick="borrarHistorialLocal()">🗑️ Limpiar local</button>
+      </div>
+    </div>
+    <div class="line"></div>
+    <div style="overflow:auto">
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Total</th><th>Origen</th><th class="no-print">Acciones</th></tr>
+        </thead>
+        <tbody id="tbodyHistorial"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="card">
@@ -111,7 +135,7 @@
       <div class="row between" style="margin-top:8px">
         <div class="row" style="gap:6px">
           <button class="secondary" onclick="exportarCatalogo('clientes')">⬇️ Exportar</button>
-          <input type="file" id="importClientesFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'clientes')">
+          <input type="file" id="importClientesFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'clientes')" />
           <button class="secondary" onclick="document.getElementById('importClientesFile').click()">⬆️ Importar</button>
         </div>
         <button class="danger" onclick="borrarTodosClientes()">🗑️ Borrar todos</button>
@@ -138,7 +162,7 @@
       <div class="row between" style="margin-top:8px">
         <div class="row" style="gap:6px">
           <button class="secondary" onclick="exportarCatalogo('productos')">⬇️ Exportar</button>
-          <input type="file" id="importProductosFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'productos')">
+          <input type="file" id="importProductosFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'productos')" />
           <button class="secondary" onclick="document.getElementById('importProductosFile').click()">⬆️ Importar</button>
         </div>
         <button class="danger" onclick="borrarTodosProductos()">🗑️ Borrar todos</button>
@@ -153,7 +177,7 @@
       <div class="row between" style="align-items:center">
         <div>Descuento</div>
         <div class="row" style="align-items:center">
-          <input style="width:90px;text-align:right" type="number" min="0" max="100" step="0.5" id="descuento" value="0" oninput="calc()">
+          <input style="width:90px;text-align:right" type="number" min="0" max="100" step="0.5" id="descuento" value="0" oninput="calc()" />
           <div style="width:24px;text-align:center">%</div>
           <div style="width:130px;text-align:right">-<span id="descMonto">$0</span></div>
         </div>
@@ -167,16 +191,14 @@
 
   <!-- Firebase (módulos) -->
   <script type="module">
-    // SDKs necesarios
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
     import {
-      getFirestore, collection, doc, setDoc, deleteDoc,
-      onSnapshot, getDocs, query, orderBy, limit
+      getFirestore, collection, doc, setDoc, deleteDoc, addDoc,
+      onSnapshot, getDocs, query, orderBy, limit, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
-    // (Analytics no es necesario para sincronizar, pero puedes añadirlo si quieres)
 
-    // ===== Tu configuración (la que nos pasaste) =====
+    // Config que me diste
     const firebaseConfig = {
       apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
       authDomain: "notas-tmp.firebaseapp.com",
@@ -190,19 +212,19 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // ===== Utilidades UI / formato =====
+    // ===== Utilidades
     const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
-    const $ = id => document.getElementById(id);
-    const download = (name,content)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));a.download=name;a.click();};
+    const $ = (id)=>document.getElementById(id);
+    const download=(name,content)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));a.download=name;a.click();}
 
-    // ===== LocalStorage keys =====
+    // ===== LocalStorage keys
     const LS={FOLIO:"tmp_folio",HIST:"tmp_historial",CLIENTES:"tmp_clientes",PRODUCTOS:"tmp_productos",COMPANY:"tmp_company_key"};
 
-    // ===== Estado =====
-    const state={nota:{items:[]},clientes:[],productos:[],companyKey:localStorage.getItem(LS.COMPANY)||""};
-    let unsubClientes=null,unsubProductos=null;
+    // ===== Estado
+    const state={nota:{items:[]},clientes:[],productos:[],histLocal:[],companyKey:localStorage.getItem(LS.COMPANY)||""};
+    let unsubClientes=null,unsubProductos=null,unsubHist=null;
 
-    // ===== Inicio =====
+    // ===== Inicio
     document.addEventListener("DOMContentLoaded", async ()=>{
       $('fecha').textContent=new Date().toLocaleDateString("es-MX");
       const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
@@ -211,69 +233,74 @@
       setSyncStatus(state.companyKey?`Con clave: ${state.companyKey}`:"sin sincronizar");
 
       cargarCatalogosLocal();
-      addItem(); calc();
+      cargarHistorialLocal();
+      addItem(); calc(); renderHistorial();
 
       if(state.companyKey){
-        await signIn();
-        activarListeners();
-        await syncLocalIfCloudEmpty();
+        await signIn(); activarListeners(); await primeCloud();
       }
     });
 
-    function setSyncStatus(msg){ $('syncStatus').textContent="Estado: "+msg; }
-    async function signIn(){ try{ await signInAnonymously(auth); }catch(e){ alert("No se pudo iniciar sesión anónima"); console.error(e);} }
+    const setSyncStatus=(m)=>$('syncStatus').textContent="Estado: "+m;
+    async function signIn(){ try{ await signInAnonymously(auth);}catch(e){console.error(e);alert("No se pudo iniciar sesión anónima");} }
 
-    // Rutas Firestore por compañía
-    const cClientes=()=>collection(db,"companies",state.companyKey,"clientes");
-    const cProductos=()=>collection(db,"companies",state.companyKey,"productos");
+    // Rutas por compañía
+    const colClientes = ()=>collection(db,"companies",state.companyKey,"clientes");
+    const colProductos= ()=>collection(db,"companies",state.companyKey,"productos");
+    const colHistorial = ()=>collection(db,"companies",state.companyKey,"historial");
 
-    // Activa listeners en tiempo real
     function activarListeners(){
       if(!state.companyKey) return;
-      unsubClientes && unsubClientes(); unsubProductos && unsubProductos();
+      unsubClientes && unsubClientes(); unsubProductos && unsubProductos(); unsubHist && unsubHist();
 
-      unsubClientes = onSnapshot(query(cClientes(),orderBy("nombre")), snap=>{
-        const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      unsubClientes = onSnapshot(query(colClientes(),orderBy("nombre")),s=>{
+        const arr=[]; s.forEach(d=>arr.push(d.data()));
         if(arr.length){ state.clientes=arr; localStorage.setItem(LS.CLIENTES,JSON.stringify(arr)); }
         poblarClientesUI(); if($('#adminClientes').style.display==='block') renderAdminClientes();
         setSyncStatus(`sincronizado (${state.companyKey})`);
       });
 
-      unsubProductos = onSnapshot(query(cProductos(),orderBy("nombre")), snap=>{
-        const arr=[]; snap.forEach(d=>arr.push(d.data()));
+      unsubProductos = onSnapshot(query(colProductos(),orderBy("nombre")),s=>{
+        const arr=[]; s.forEach(d=>arr.push(d.data()));
         if(arr.length){ state.productos=arr; localStorage.setItem(LS.PRODUCTOS,JSON.stringify(arr)); }
         refrescarSelectsProductos(); if($('#adminProductos').style.display==='block') renderAdminProductos();
-        setSyncStatus(`sincronizado (${state.companyKey})`);
+      });
+
+      // Historial (últimas 100 notas)
+      unsubHist = onSnapshot(query(colHistorial(),orderBy("ts","desc"),limit(100)), s=>{
+        const cloud=[]; s.forEach(d=>cloud.push({...d.data(), _id:d.id, origen:"Nube"}));
+        // Fusiona nube con local para mostrar (sin duplicados por id/nube)
+        const local = state.histLocal.map(h=>({...h, origen:"Local"}));
+        const key = (h)=>h._id || `${h.folio}-${h.fecha}-${h.total}`;
+        const seen = new Set(); const merged=[];
+        [...cloud, ...local].forEach(h=>{const k=key(h); if(!seen.has(k)){seen.add(k); merged.push(h);}});
+        state.histMerged = merged;
+        renderHistorial();
       });
     }
 
-    // Sube local si la nube está vacía (primera vez)
-    async function syncLocalIfCloudEmpty(){
-      const cSnap = await getDocs(query(cClientes(),limit(1)));
-      const pSnap = await getDocs(query(cProductos(),limit(1)));
-      if(cSnap.empty && state.clientes.length){
-        await Promise.all(state.clientes.map(c=>setDoc(doc(cClientes(),c.nombre),c)));
-      }
-      if(pSnap.empty && state.productos.length){
-        await Promise.all(state.productos.map(p=>setDoc(doc(cProductos(),p.nombre),p)));
-      }
+    // Sube catálogos locales si nube está vacía
+    async function primeCloud(){
+      const cSnap=await getDocs(query(colClientes(),limit(1)));
+      const pSnap=await getDocs(query(colProductos(),limit(1)));
+      if(cSnap.empty && state.clientes.length){ await Promise.all(state.clientes.map(c=>setDoc(doc(colClientes(),c.nombre),c))); }
+      if(pSnap.empty && state.productos.length){ await Promise.all(state.productos.map(p=>setDoc(doc(colProductos(),p.nombre),p))); }
     }
 
-    // Activar / Desactivar sync
+    // Activar/Desactivar sync
     window.activarSync = async ()=>{
-      const key=($('companyKey').value||"").trim();
-      if(!key){ alert("Escribe una clave (ej: TMP-CHIH)"); return; }
+      const key=($('companyKey').value||"").trim(); if(!key){alert("Escribe una clave (ej: TMP-CHIH)");return;}
       state.companyKey=key; localStorage.setItem(LS.COMPANY,key);
-      await signIn(); activarListeners(); await syncLocalIfCloudEmpty();
+      await signIn(); activarListeners(); await primeCloud();
       setSyncStatus(`sincronizado (${key})`); alert("Sincronización activada ✅");
     };
     window.desactivarSync = ()=>{
       localStorage.removeItem(LS.COMPANY); state.companyKey="";
-      unsubClientes && unsubClientes(); unsubProductos && unsubProductos();
+      unsubClientes&&unsubClientes(); unsubProductos&&unsubProductos(); unsubHist&&unsubHist();
       setSyncStatus("sin sincronizar"); alert("Sincronización desactivada");
     };
 
-    // ===== Catálogos local =====
+    // ===== Catálogos Local
     function cargarCatalogosLocal(){
       try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{state.clientes=[]}
       try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{state.productos=[]}
@@ -285,7 +312,16 @@
       poblarClientesUI(); refrescarSelectsProductos();
     }
 
-    // ===== Clientes =====
+    // ===== Historial Local
+    function cargarHistorialLocal(){
+      try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{state.histLocal=[]}
+    }
+    function guardarHistorialLocal(arr){
+      state.histLocal = arr;
+      localStorage.setItem(LS.HIST, JSON.stringify(arr));
+    }
+
+    // ===== Clientes
     function poblarClientesUI(){
       const sel=$('selCliente');
       sel.innerHTML='<option value="">— Elegir cliente —</option>'+state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
@@ -300,7 +336,7 @@
       const exists=state.clientes.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase());
       if(!exists) state.clientes.unshift({nombre,direccion}); else state.clientes=state.clientes.map(c=>c.nombre.toLowerCase()===nombre.toLowerCase()?({...c,direccion}):c);
       guardarCatalogosLocal();
-      if(state.companyKey){ await setDoc(doc(cClientes(),nombre),{nombre,direccion}); }
+      if(state.companyKey){ await setDoc(doc(colClientes(),nombre),{nombre,direccion}); }
       alert("Cliente guardado ✅");
     };
     function renderAdminClientes(){
@@ -316,23 +352,24 @@
     window.eliminarCliente = async (i)=>{
       const nombre=state.clientes[i].nombre;
       state.clientes.splice(i,1); guardarCatalogosLocal();
-      if(state.companyKey){ await deleteDoc(doc(cClientes(),nombre)).catch(()=>{}); }
+      if(state.companyKey){ await deleteDoc(doc(colClientes(),nombre)).catch(()=>{}); }
       renderAdminClientes();
     };
     window.borrarTodosClientes = async ()=>{
       if(!confirm("¿Borrar todos los clientes?")) return;
       const arr=[...state.clientes]; state.clientes=[]; guardarCatalogosLocal();
-      if(state.companyKey){ await Promise.all(arr.map(c=>deleteDoc(doc(cClientes(),c.nombre)).catch(()=>{}))); }
+      if(state.companyKey){ await Promise.all(arr.map(c=>deleteDoc(doc(colClientes(),c.nombre)).catch(()=>{}))); }
       renderAdminClientes();
     };
 
-    // ===== Productos =====
+    // ===== Productos
     function refrescarSelectsProductos(){
       document.querySelectorAll('.selProducto').forEach((el,idx)=>poblarSelectProducto(el,$('item-desc-'+idx),$('item-precio-'+idx)));
     }
     function poblarSelectProducto(selectEl,descEl,precioEl){
       selectEl.innerHTML='<option value="">— Producto —</option>'+state.productos.map((p,i)=>`<option value="${i}">${p.nombre} (${mxn.format(p.precio)})</option>`).join('');
-      selectEl.onchange=()=>{ const idx=selectEl.value; if(idx==="") return; const p=state.productos[Number(idx)]; descEl.value=p.nombre; precioEl.value=p.precio; descEl.dispatchEvent(new Event('input')); precioEl.dispatchEvent(new Event('input')); };
+      selectEl.onchange=()=>{ const idx=selectEl.value; if(idx==="") return; const p=state.productos[Number(idx)];
+        descEl.value=p.nombre; precioEl.value=p.precio; descEl.dispatchEvent(new Event('input')); precioEl.dispatchEvent(new Event('input')); };
     }
     window.guardarProductoDesdeFila = async (idx)=>{
       const desc=$('item-desc-'+idx).value.trim(), precio=Number($('item-precio-'+idx).value||0);
@@ -340,7 +377,7 @@
       const exists=state.productos.some(p=>p.nombre.toLowerCase()===desc.toLowerCase());
       if(!exists) state.productos.unshift({nombre:desc,precio}); else state.productos=state.productos.map(p=>p.nombre.toLowerCase()===desc.toLowerCase()?({...p,precio}):p);
       guardarCatalogosLocal();
-      if(state.companyKey){ await setDoc(doc(cProductos(),desc),{nombre:desc,precio}); }
+      if(state.companyKey){ await setDoc(doc(colProductos(),desc),{nombre:desc,precio}); }
       alert("Producto guardado ✅");
     };
     function renderAdminProductos(){
@@ -356,17 +393,17 @@
     window.eliminarProducto = async (i)=>{
       const nombre=state.productos[i].nombre;
       state.productos.splice(i,1); guardarCatalogosLocal();
-      if(state.companyKey){ await deleteDoc(doc(cProductos(),nombre)).catch(()=>{}); }
+      if(state.companyKey){ await deleteDoc(doc(colProductos(),nombre)).catch(()=>{}); }
       renderAdminProductos();
     };
     window.borrarTodosProductos = async ()=>{
       if(!confirm("¿Borrar todos los productos?")) return;
       const arr=[...state.productos]; state.productos=[]; guardarCatalogosLocal();
-      if(state.companyKey){ await Promise.all(arr.map(p=>deleteDoc(doc(cProductos(),p.nombre)).catch(()=>{}))); }
+      if(state.companyKey){ await Promise.all(arr.map(p=>deleteDoc(doc(colProductos(),p.nombre)).catch(()=>{}))); }
       renderAdminProductos();
     };
 
-    // ===== Ítems y totales =====
+    // ===== Ítems y Totales
     window.addItem = ()=>{
       const idx=state.nota.items.length;
       state.nota.items.push({id:Date.now()+idx,descripcion:'',cantidad:1,precio:0});
@@ -388,37 +425,87 @@
           </div>
         </div>`;
       $('items').appendChild(row);
-      const descEl=$('item-desc-'+idx), cantEl=$('item-cant-'+idx), precioEl=$('item-precio-'+idx), totalEl=$('item-total-'+idx), selEl=$('item-sel-'+idx);
+      const descEl=$('item-desc-'+idx), cantEl=$('item-cant-'+idx), precioEl=$('item-precio-'+idx), totalEl=$('item-total-'+idx);
       descEl.oninput=()=>{state.nota.items[idx].descripcion=descEl.value; calcFila(idx,totalEl,cantEl,precioEl);};
       cantEl.oninput=()=>{state.nota.items[idx].cantidad=Number(cantEl.value||0); calcFila(idx,totalEl,cantEl,precioEl);};
       precioEl.oninput=()=>{state.nota.items[idx].precio=Number(precioEl.value||0); calcFila(idx,totalEl,cantEl,precioEl);};
-      poblarSelectsProductos(); calc();
+      refrescarSelectsProductos(); calc();
     };
-    function calcFila(idx,totalEl,cantEl,precioEl){const cant=Number(cantEl.value||0), precio=Number(precioEl.value||0); totalEl.textContent=mxn.format(cant*precio); calc();}
+    function calcFila(idx,totalEl,cantEl,precioEl){const cant=Number(cantEl.value||0),precio=Number(precioEl.value||0); totalEl.textContent=mxn.format(cant*precio); calc();}
     window.removeItem = (idx)=>{
       state.nota.items.splice(idx,1); $('items').innerHTML=''; const prev=[...state.nota.items]; state.nota.items=[];
       prev.forEach(()=>addItem()); prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio; ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));}); calc();
     };
     function calc(){const subtotal=(state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0); const desc=subtotal*(Number($('descuento').value||0)/100); const total=Math.max(0,subtotal-desc); $('subtotal').textContent=mxn.format(subtotal); $('descMonto').textContent=mxn.format(desc); $('total').textContent=mxn.format(total);}
 
-    // ===== Historial / folios =====
-    window.guardarHistorial = ()=>{
-      const folioActual=$('folio').textContent, cliente=$('cliente').value||"—", total=$('total').textContent;
-      const hist=JSON.parse(localStorage.getItem(LS.HIST)||"[]"); hist.unshift({folio:folioActual,cliente,total,fecha:new Date().toLocaleDateString("es-MX")}); localStorage.setItem(LS.HIST,JSON.stringify(hist));
+    // ===== Historial (guardar / listar / borrar)
+    window.guardarHistorial = async ()=>{
+      const folio=$('folio').textContent;
+      const cliente=$('cliente').value || "—";
+      const total=$('total').textContent;
+      const fecha=new Date().toLocaleDateString("es-MX");
+
+      // Local
+      const hist=JSON.parse(localStorage.getItem(LS.HIST)||"[]");
+      const item={folio,cliente,total,fecha};
+      hist.unshift(item);
+      guardarHistorialLocal(hist);
+
+      // Nube
+      if(state.companyKey){
+        await addDoc(colHistorial(), { folio, cliente, total, fecha, ts: serverTimestamp() });
+      }
+
+      // Avanza folio y recarga
       let folioNum=Number(localStorage.getItem(LS.FOLIO)||1); folioNum++; localStorage.setItem(LS.FOLIO,folioNum);
-      alert("Nota guardada ✅ Nuevo folio: TMP-"+String(folioNum).padStart(4,"0")); location.reload();
+      alert("Nota guardada ✅ Nuevo folio: TMP-"+String(folioNum).padStart(4,"0"));
+      location.reload();
     };
 
-    // Admin toggles
+    function renderHistorial(){
+      const term = ($('buscaHist')?.value || '').toLowerCase();
+      const data = (state.histMerged || state.histLocal || []);
+      const rows = data
+        .filter(h => !term || (h.folio?.toLowerCase().includes(term) || (h.cliente||'').toLowerCase().includes(term)))
+        .map(h => {
+          const id = h._id || '';
+          return `<tr>
+            <td>${h.fecha||'—'}</td>
+            <td>${h.folio||'—'}</td>
+            <td>${h.cliente||'—'}</td>
+            <td>${h.total||'—'}</td>
+            <td>${h.origen||'Local'}</td>
+            <td class="no-print">
+              ${id?`<button class="danger" onclick="eliminarHistNube('${id}')">Borrar nube</button>`:''}
+            </td>
+          </tr>`;
+        }).join('');
+      $('tbodyHistorial').innerHTML = rows || `<tr><td colspan="6" class="muted">Sin registros.</td></tr>`;
+    }
+
+    window.eliminarHistNube = async (id)=>{
+      if(!state.companyKey) return;
+      if(!confirm("¿Borrar este registro de la nube?")) return;
+      try{ await deleteDoc(doc(colHistorial(), id)); }catch{}
+    };
+
+    window.borrarHistorialLocal = ()=>{
+      if(!confirm("¿Borrar historial LOCAL del dispositivo?")) return;
+      guardarHistorialLocal([]); renderHistorial();
+    };
+
+    // Admin / toggles
     window.toggleAdmin = id => { const el=$(id); el.style.display=(el.style.display==='block')?'none':'block'; if(id==='adminClientes') renderAdminClientes(); if(id==='adminProductos') renderAdminProductos(); };
-    // Exportar/Importar JSON local
+    window.toggleHistorial = ()=>{ const el=$('historialCard'); el.style.display=(el.style.display==='block')?'none':'block'; renderHistorial(); };
+
+    // Exportar/Importar catálogos locales
     window.exportarCatalogo = tipo => { const data=tipo==='clientes'?state.clientes:state.productos; download(`${tipo}-tmp.json`,JSON.stringify(data,null,2)); };
     window.importarCatalogo = (e,tipo)=>{
       const file=e.target.files[0]; if(!file) return;
       const reader=new FileReader(); reader.onload=async ()=>{
         try{ const arr=JSON.parse(reader.result||"[]"); if(!Array.isArray(arr)) throw new Error("Formato inválido");
-          if(tipo==='clientes'){ state.clientes=arr; if(state.companyKey){ await Promise.all(arr.map(c=>setDoc(doc(cClientes(),c.nombre),c))); } }
-          else { state.productos=arr; if(state.companyKey){ await Promise.all(arr.map(p=>setDoc(doc(cProductos(),p.nombre),p))); } }
+          if(tipo==='clientes'){ state.clientes=arr; if(state.companyKey){ await Promise.all(arr.map(c=>setDoc(doc(colClientes(),c.nombre),c))); } }
+          else { state.productos=arr; if(state.companyKey){ await Promise.all(arr.map(p=>setDoc(doc(colProductos(),p.nombre),p))); } }
           guardarCatalogosLocal(); (tipo==='clientes'?renderAdminClientes:renderAdminProductos)(); alert("Catálogo importado ✅");
         }catch(err){ alert("No se pudo importar: "+err.message); }
         e.target.value='';
