@@ -11,27 +11,26 @@
   <meta name="apple-mobile-web-app-title" content="Notas TMP">
   <style>
     :root{--c:#00b5ad}
-    body { font-family: system-ui, sans-serif; background:#f8fafc; color:#222; margin:0; padding:16px; }
-    h1 { text-align:center; color:var(--c); }
-    .card { background:#fff; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.1); padding:16px; max-width:1000px; margin:20px auto; }
-    .row { display:flex; align-items:center; gap:8px; }
-    .between { justify-content:space-between; }
-    .actions { text-align:center; margin-bottom:16px; }
-    button { background:var(--c); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
-    button.secondary { background:#e6f7f6; color:#0d6662; }
-    button.danger { background:#e55252; }
-    button:hover { opacity:.95 }
-    input, textarea, select { border:1px solid #cfd6de; border-radius:8px; padding:8px 10px; width:100%; font-size:14px; }
-    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .grid3 { display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; }
-    .line { border-top:1px solid #e5e7eb; margin:12px 0; }
-    .total { font-weight:700; }
-    .right { text-align:right; }
-    .admin { display:none; padding:12px; border:1px dashed #cfd6de; border-radius:10px; background:#fafcff; margin-top:8px; }
-    .admin h4{ margin:0 0 8px 0; }
-    .admin-list .row{ justify-content:space-between; padding:6px 0; border-bottom:1px solid #eef2f6; }
-    .admin-list .row:last-child{ border-bottom:none; }
-    @media print { #acciones, .no-print, .admin { display:none!important } body{ background:#fff } .card{ box-shadow:none } }
+    body{font-family:system-ui,sans-serif;background:#f8fafc;color:#222;margin:0;padding:16px}
+    h1{text-align:center;color:var(--c)}
+    .card{background:#fff;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.1);padding:16px;max-width:1000px;margin:20px auto}
+    .row{display:flex;align-items:center;gap:8px}
+    .between{justify-content:space-between}
+    .actions{text-align:center;margin-bottom:16px}
+    button{background:var(--c);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+    button.secondary{background:#e6f7f6;color:#0d6662}
+    button.danger{background:#e55252}
+    input,textarea,select{border:1px solid #cfd6de;border-radius:8px;padding:8px 10px;width:100%;font-size:14px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+    .line{border-top:1px solid #e5e7eb;margin:12px 0}
+    .total{font-weight:700}
+    .right{text-align:right}
+    .admin{display:none;padding:12px;border:1px dashed #cfd6de;border-radius:10px;background:#fafcff;margin-top:8px}
+    .admin-list .row{justify-content:space-between;padding:6px 0;border-bottom:1px solid #eef2f6}
+    .admin-list .row:last-child{border-bottom:none}
+    .muted{color:#6b7785;font-size:12px}
+    @media print{#acciones,.no-print,.admin{display:none!important}body{background:#fff}.card{box-shadow:none}}
   </style>
 </head>
 <body>
@@ -41,6 +40,24 @@
   <div id="acciones" class="actions">
     <button onclick="guardarHistorial()">💾 Guardar / Nuevo folio</button>
     <button onclick="window.print()">🖨️ Imprimir / PDF</button>
+  </div>
+
+  <!-- SINCRONIZACIÓN -->
+  <div class="card no-print">
+    <h3 style="margin:6px 0">🔄 Sincronización en la nube (Firebase)</h3>
+    <div class="grid2">
+      <div>
+        <label>Clave de empresa (usa una por sucursal/usuario, ej. TMP-CHIH)</label>
+        <input id="companyKey" placeholder="Ej: TMP-CHIH">
+      </div>
+      <div class="row" style="align-items:end">
+        <div class="row" style="gap:8px">
+          <button class="secondary" onclick="activarSync()">Activar sync</button>
+          <button class="danger" onclick="desactivarSync()">Desactivar</button>
+        </div>
+      </div>
+    </div>
+    <div class="muted" id="syncStatus" style="margin-top:6px">Estado: sin sincronizar</div>
   </div>
 
   <div class="card">
@@ -132,10 +149,7 @@
 
     <!-- TOTALES -->
     <div style="max-width:420px;margin-left:auto;display:grid;gap:8px">
-      <div class="row between">
-        <span>Subtotal (IVA incluido)</span>
-        <b id="subtotal">$0</b>
-      </div>
+      <div class="row between"><span>Subtotal (IVA incluido)</span><b id="subtotal">$0</b></div>
       <div class="row between" style="align-items:center">
         <div>Descuento</div>
         <div class="row" style="align-items:center">
@@ -144,211 +158,224 @@
           <div style="width:130px;text-align:right">-<span id="descMonto">$0</span></div>
         </div>
       </div>
-      <div class="row between total">
-        <span>Total</span>
-        <b id="total">$0</b>
-      </div>
+      <div class="row between total"><span>Total</span><b id="total">$0</b></div>
     </div>
 
     <div class="line"></div>
-
     <textarea id="notas" placeholder="Notas adicionales" rows="3" style="width:100%"></textarea>
   </div>
 
-  <script>
-    // ===== Utilidades =====
-    const mxn = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
-    const $ = id => document.getElementById(id);
-    const download = (name, content) => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([content],{type:'application/json'}));
-      a.download = name; a.click();
-    };
+  <!-- Firebase (módulos) -->
+  <script type="module">
+    // SDKs necesarios
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, setDoc, deleteDoc,
+      onSnapshot, getDocs, query, orderBy, limit
+    } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+    // (Analytics no es necesario para sincronizar, pero puedes añadirlo si quieres)
 
-    // ===== Claves de almacenamiento =====
-    const LS = {
-      FOLIO: "tmp_folio",
-      HIST: "tmp_historial",
-      CLIENTES: "tmp_clientes",
-      PRODUCTOS: "tmp_productos"
+    // ===== Tu configuración (la que nos pasaste) =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
+      authDomain: "notas-tmp.firebaseapp.com",
+      projectId: "notas-tmp",
+      storageBucket: "notas-tmp.firebasestorage.app",
+      messagingSenderId: "640595451791",
+      appId: "1:640595451791:web:dd150bca4cfb8cbc6735fa",
+      measurementId: "G-JZZPDPNE03"
     };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ===== Utilidades UI / formato =====
+    const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
+    const $ = id => document.getElementById(id);
+    const download = (name,content)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));a.download=name;a.click();};
+
+    // ===== LocalStorage keys =====
+    const LS={FOLIO:"tmp_folio",HIST:"tmp_historial",CLIENTES:"tmp_clientes",PRODUCTOS:"tmp_productos",COMPANY:"tmp_company_key"};
 
     // ===== Estado =====
-    const state = {
-      nota: { items: [] },
-      clientes: [],
-      productos: []
-    };
+    const state={nota:{items:[]},clientes:[],productos:[],companyKey:localStorage.getItem(LS.COMPANY)||""};
+    let unsubClientes=null,unsubProductos=null;
 
-    // ===== Carga inicial =====
-    document.addEventListener("DOMContentLoaded", () => {
-      $('fecha').textContent = new Date().toLocaleDateString("es-MX");
-      const folioNum = Number(localStorage.getItem(LS.FOLIO) || 1);
-      $('folio').textContent = "TMP-" + String(folioNum).padStart(4,"0");
+    // ===== Inicio =====
+    document.addEventListener("DOMContentLoaded", async ()=>{
+      $('fecha').textContent=new Date().toLocaleDateString("es-MX");
+      const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
+      $('folio').textContent="TMP-"+String(folioNum).padStart(4,"0");
+      $('companyKey').value=state.companyKey;
+      setSyncStatus(state.companyKey?`Con clave: ${state.companyKey}`:"sin sincronizar");
 
-      cargarCatalogos();
-      addItem(); // primer renglón
-      calc();
+      cargarCatalogosLocal();
+      addItem(); calc();
+
+      if(state.companyKey){
+        await signIn();
+        activarListeners();
+        await syncLocalIfCloudEmpty();
+      }
     });
 
-    // ===== Mostrar/Ocultar secciones admin =====
-    function toggleAdmin(id){
-      const el = $(id);
-      el.style.display = (el.style.display === 'block') ? 'none' : 'block';
-      if(id === 'adminClientes') renderAdminClientes();
-      if(id === 'adminProductos') renderAdminProductos();
+    function setSyncStatus(msg){ $('syncStatus').textContent="Estado: "+msg; }
+    async function signIn(){ try{ await signInAnonymously(auth); }catch(e){ alert("No se pudo iniciar sesión anónima"); console.error(e);} }
+
+    // Rutas Firestore por compañía
+    const cClientes=()=>collection(db,"companies",state.companyKey,"clientes");
+    const cProductos=()=>collection(db,"companies",state.companyKey,"productos");
+
+    // Activa listeners en tiempo real
+    function activarListeners(){
+      if(!state.companyKey) return;
+      unsubClientes && unsubClientes(); unsubProductos && unsubProductos();
+
+      unsubClientes = onSnapshot(query(cClientes(),orderBy("nombre")), snap=>{
+        const arr=[]; snap.forEach(d=>arr.push(d.data()));
+        if(arr.length){ state.clientes=arr; localStorage.setItem(LS.CLIENTES,JSON.stringify(arr)); }
+        poblarClientesUI(); if($('#adminClientes').style.display==='block') renderAdminClientes();
+        setSyncStatus(`sincronizado (${state.companyKey})`);
+      });
+
+      unsubProductos = onSnapshot(query(cProductos(),orderBy("nombre")), snap=>{
+        const arr=[]; snap.forEach(d=>arr.push(d.data()));
+        if(arr.length){ state.productos=arr; localStorage.setItem(LS.PRODUCTOS,JSON.stringify(arr)); }
+        refrescarSelectsProductos(); if($('#adminProductos').style.display==='block') renderAdminProductos();
+        setSyncStatus(`sincronizado (${state.companyKey})`);
+      });
     }
 
-    // ===== Catálogos =====
-    function cargarCatalogos(){
-      try { state.clientes = JSON.parse(localStorage.getItem(LS.CLIENTES) || "[]"); } catch { state.clientes = []; }
-      try { state.productos = JSON.parse(localStorage.getItem(LS.PRODUCTOS) || "[]"); } catch { state.productos = []; }
-      // poblar select de clientes
-      const sel = $('selCliente');
-      sel.innerHTML = '<option value="">— Elegir cliente —</option>' + state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
+    // Sube local si la nube está vacía (primera vez)
+    async function syncLocalIfCloudEmpty(){
+      const cSnap = await getDocs(query(cClientes(),limit(1)));
+      const pSnap = await getDocs(query(cProductos(),limit(1)));
+      if(cSnap.empty && state.clientes.length){
+        await Promise.all(state.clientes.map(c=>setDoc(doc(cClientes(),c.nombre),c)));
+      }
+      if(pSnap.empty && state.productos.length){
+        await Promise.all(state.productos.map(p=>setDoc(doc(cProductos(),p.nombre),p)));
+      }
     }
-    function guardarCatalogos(){
-      localStorage.setItem(LS.CLIENTES, JSON.stringify(state.clientes));
-      localStorage.setItem(LS.PRODUCTOS, JSON.stringify(state.productos));
-      cargarCatalogos();
-      // refrescar selects de productos en cada ítem
-      document.querySelectorAll('.selProducto').forEach((el,idx)=>poblarSelectProducto(el, $('item-desc-'+idx), $('item-precio-'+idx)));
+
+    // Activar / Desactivar sync
+    window.activarSync = async ()=>{
+      const key=($('companyKey').value||"").trim();
+      if(!key){ alert("Escribe una clave (ej: TMP-CHIH)"); return; }
+      state.companyKey=key; localStorage.setItem(LS.COMPANY,key);
+      await signIn(); activarListeners(); await syncLocalIfCloudEmpty();
+      setSyncStatus(`sincronizado (${key})`); alert("Sincronización activada ✅");
+    };
+    window.desactivarSync = ()=>{
+      localStorage.removeItem(LS.COMPANY); state.companyKey="";
+      unsubClientes && unsubClientes(); unsubProductos && unsubProductos();
+      setSyncStatus("sin sincronizar"); alert("Sincronización desactivada");
+    };
+
+    // ===== Catálogos local =====
+    function cargarCatalogosLocal(){
+      try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{state.clientes=[]}
+      try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{state.productos=[]}
+      poblarClientesUI(); refrescarSelectsProductos();
+    }
+    function guardarCatalogosLocal(){
+      localStorage.setItem(LS.CLIENTES,JSON.stringify(state.clientes));
+      localStorage.setItem(LS.PRODUCTOS,JSON.stringify(state.productos));
+      poblarClientesUI(); refrescarSelectsProductos();
     }
 
     // ===== Clientes =====
-    function aplicarClienteSeleccionado(){
-      const idx = $('selCliente').value;
-      if (idx === "") return;
-      const c = state.clientes[Number(idx)];
-      $('cliente').value = c?.nombre || '';
-      $('direccion').value = c?.direccion || '';
+    function poblarClientesUI(){
+      const sel=$('selCliente');
+      sel.innerHTML='<option value="">— Elegir cliente —</option>'+state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
     }
-    function guardarClienteActual(){
-      const nombre = ($('cliente').value || '').trim();
-      const direccion = ($('direccion').value || '').trim();
-      if(!nombre){ alert("Escribe el nombre del cliente para guardarlo."); return; }
-      const exists = state.clientes.some(c => c.nombre.toLowerCase() === nombre.toLowerCase());
-      if(!exists) state.clientes.unshift({ nombre, direccion });
-      else state.clientes = state.clientes.map(c=>c.nombre.toLowerCase()===nombre.toLowerCase()?({...c,direccion}):c);
-      guardarCatalogos();
+    window.aplicarClienteSeleccionado=()=>{
+      const idx=$('selCliente').value; if(idx==="") return;
+      const c=state.clientes[Number(idx)]; $('cliente').value=c?.nombre||''; $('direccion').value=c?.direccion||'';
+    };
+    window.guardarClienteActual = async ()=>{
+      const nombre=($('cliente').value||'').trim(), direccion=($('direccion').value||'').trim();
+      if(!nombre){ alert("Escribe el nombre del cliente"); return; }
+      const exists=state.clientes.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase());
+      if(!exists) state.clientes.unshift({nombre,direccion}); else state.clientes=state.clientes.map(c=>c.nombre.toLowerCase()===nombre.toLowerCase()?({...c,direccion}):c);
+      guardarCatalogosLocal();
+      if(state.companyKey){ await setDoc(doc(cClientes(),nombre),{nombre,direccion}); }
       alert("Cliente guardado ✅");
-    }
+    };
     function renderAdminClientes(){
-      const cont = $('listaClientes'); cont.innerHTML = '';
-      if(state.clientes.length===0){ cont.innerHTML = '<div class="muted">No hay clientes guardados.</div>'; return; }
+      const cont=$('listaClientes'); cont.innerHTML='';
+      if(state.clientes.length===0){ cont.innerHTML='<div class="muted">No hay clientes guardados.</div>'; return; }
       state.clientes.forEach((c,i)=>{
-        const row = document.createElement('div');
-        row.className='row';
-        row.innerHTML = `<div><b>${c.nombre}</b><br><small>${c.direccion||'—'}</small></div>
-                         <button class="danger" onclick="eliminarCliente(${i})">Eliminar</button>`;
+        const row=document.createElement('div'); row.className='row';
+        row.innerHTML=`<div><b>${c.nombre}</b><br><small>${c.direccion||'—'}</small></div>
+                       <button class="danger" onclick="eliminarCliente(${i})">Eliminar</button>`;
         cont.appendChild(row);
       });
     }
-    function eliminarCliente(i){
-      state.clientes.splice(i,1);
-      guardarCatalogos();
+    window.eliminarCliente = async (i)=>{
+      const nombre=state.clientes[i].nombre;
+      state.clientes.splice(i,1); guardarCatalogosLocal();
+      if(state.companyKey){ await deleteDoc(doc(cClientes(),nombre)).catch(()=>{}); }
       renderAdminClientes();
-    }
-    function borrarTodosClientes(){
-      if(!confirm("¿Borrar todos los clientes guardados?")) return;
-      state.clientes = [];
-      guardarCatalogos();
+    };
+    window.borrarTodosClientes = async ()=>{
+      if(!confirm("¿Borrar todos los clientes?")) return;
+      const arr=[...state.clientes]; state.clientes=[]; guardarCatalogosLocal();
+      if(state.companyKey){ await Promise.all(arr.map(c=>deleteDoc(doc(cClientes(),c.nombre)).catch(()=>{}))); }
       renderAdminClientes();
-    }
+    };
 
     // ===== Productos =====
-    function poblarSelectProducto(selectEl, descEl, precioEl){
-      selectEl.innerHTML = '<option value="">— Producto —</option>' + state.productos.map((p,i)=>`<option value="${i}">${p.nombre} (${mxn.format(p.precio)})</option>`).join('');
-      selectEl.onchange = () => {
-        const idx = selectEl.value;
-        if(idx === "") return;
-        const p = state.productos[Number(idx)];
-        descEl.value = p.nombre;
-        precioEl.value = p.precio;
-        descEl.dispatchEvent(new Event('input'));
-        precioEl.dispatchEvent(new Event('input'));
-      };
+    function refrescarSelectsProductos(){
+      document.querySelectorAll('.selProducto').forEach((el,idx)=>poblarSelectProducto(el,$('item-desc-'+idx),$('item-precio-'+idx)));
     }
-    function guardarProductoDesdeFila(idx){
-      const desc = $('item-desc-'+idx).value.trim();
-      const precio = Number($('item-precio-'+idx).value || 0);
-      if(!desc){ alert("Escribe la descripción del producto para guardarlo."); return; }
-      const exists = state.productos.some(p => p.nombre.toLowerCase() === desc.toLowerCase());
-      if(!exists) state.productos.unshift({ nombre: desc, precio });
-      else state.productos = state.productos.map(p => p.nombre.toLowerCase() === desc.toLowerCase() ? ({ ...p, precio }) : p);
-      guardarCatalogos();
+    function poblarSelectProducto(selectEl,descEl,precioEl){
+      selectEl.innerHTML='<option value="">— Producto —</option>'+state.productos.map((p,i)=>`<option value="${i}">${p.nombre} (${mxn.format(p.precio)})</option>`).join('');
+      selectEl.onchange=()=>{ const idx=selectEl.value; if(idx==="") return; const p=state.productos[Number(idx)]; descEl.value=p.nombre; precioEl.value=p.precio; descEl.dispatchEvent(new Event('input')); precioEl.dispatchEvent(new Event('input')); };
+    }
+    window.guardarProductoDesdeFila = async (idx)=>{
+      const desc=$('item-desc-'+idx).value.trim(), precio=Number($('item-precio-'+idx).value||0);
+      if(!desc){ alert("Escribe la descripción del producto"); return; }
+      const exists=state.productos.some(p=>p.nombre.toLowerCase()===desc.toLowerCase());
+      if(!exists) state.productos.unshift({nombre:desc,precio}); else state.productos=state.productos.map(p=>p.nombre.toLowerCase()===desc.toLowerCase()?({...p,precio}):p);
+      guardarCatalogosLocal();
+      if(state.companyKey){ await setDoc(doc(cProductos(),desc),{nombre:desc,precio}); }
       alert("Producto guardado ✅");
-    }
+    };
     function renderAdminProductos(){
-      const cont = $('listaProductos'); cont.innerHTML = '';
-      if(state.productos.length===0){ cont.innerHTML = '<div class="muted">No hay productos guardados.</div>'; return; }
+      const cont=$('listaProductos'); cont.innerHTML='';
+      if(state.productos.length===0){ cont.innerHTML='<div class="muted">No hay productos guardados.</div>'; return; }
       state.productos.forEach((p,i)=>{
-        const row = document.createElement('div');
-        row.className='row';
-        row.innerHTML = `<div><b>${p.nombre}</b><br><small>${mxn.format(p.precio)}</small></div>
-                         <button class="danger" onclick="eliminarProducto(${i})">Eliminar</button>`;
+        const row=document.createElement('div'); row.className='row';
+        row.innerHTML=`<div><b>${p.nombre}</b><br><small>${mxn.format(p.precio)}</small></div>
+                       <button class="danger" onclick="eliminarProducto(${i})">Eliminar</button>`;
         cont.appendChild(row);
       });
     }
-    function eliminarProducto(i){
-      state.productos.splice(i,1);
-      guardarCatalogos();
+    window.eliminarProducto = async (i)=>{
+      const nombre=state.productos[i].nombre;
+      state.productos.splice(i,1); guardarCatalogosLocal();
+      if(state.companyKey){ await deleteDoc(doc(cProductos(),nombre)).catch(()=>{}); }
       renderAdminProductos();
-    }
-    function borrarTodosProductos(){
-      if(!confirm("¿Borrar todos los productos guardados?")) return;
-      state.productos = [];
-      guardarCatalogos();
+    };
+    window.borrarTodosProductos = async ()=>{
+      if(!confirm("¿Borrar todos los productos?")) return;
+      const arr=[...state.productos]; state.productos=[]; guardarCatalogosLocal();
+      if(state.companyKey){ await Promise.all(arr.map(p=>deleteDoc(doc(cProductos(),p.nombre)).catch(()=>{}))); }
       renderAdminProductos();
-    }
+    };
 
-    // ===== Exportar / Importar catálogos (JSON) =====
-    function exportarCatalogo(tipo){
-      const data = tipo==='clientes' ? state.clientes : state.productos;
-      download(`${tipo}-tmp.json`, JSON.stringify(data, null, 2));
-    }
-    function importarCatalogo(e,tipo){
-      const file = e.target.files[0]; if(!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try{
-          const arr = JSON.parse(reader.result||"[]");
-          if(!Array.isArray(arr)) throw new Error("Formato inválido");
-          if(tipo==='clientes') state.clientes = arr;
-          else state.productos = arr;
-          guardarCatalogos();
-          if(tipo==='clientes') renderAdminClientes(); else renderAdminProductos();
-          alert("Catálogo importado ✅");
-        }catch(err){ alert("No se pudo importar: " + err.message); }
-        e.target.value = '';
-      };
-      reader.readAsText(file);
-    }
-
-    // ===== Ítems =====
-    function addItem(){
-      const idx = state.nota.items.length;
-      state.nota.items.push({ id: Date.now()+idx, descripcion:'', cantidad:1, precio:0 });
-
-      const row = document.createElement('div');
-      row.className = 'card';
-      row.style.padding = '10px';
-      row.style.margin = '8px 0';
-
-      row.innerHTML = `
+    // ===== Ítems y totales =====
+    window.addItem = ()=>{
+      const idx=state.nota.items.length;
+      state.nota.items.push({id:Date.now()+idx,descripcion:'',cantidad:1,precio:0});
+      const row=document.createElement('div'); row.className='card'; row.style.padding='10px'; row.style.margin='8px 0';
+      row.innerHTML=`
         <div class="grid3">
-          <div>
-            <label>Descripción</label>
-            <input id="item-desc-${idx}" placeholder="Descripción">
-          </div>
-          <div>
-            <label>Cantidad</label>
-            <input type="number" id="item-cant-${idx}" value="1" min="0">
-          </div>
-          <div>
-            <label>Precio</label>
-            <input type="number" id="item-precio-${idx}" value="0" min="0">
-          </div>
+          <div><label>Descripción</label><input id="item-desc-${idx}" placeholder="Descripción"></div>
+          <div><label>Cantidad</label><input type="number" id="item-cant-${idx}" value="1" min="0"></div>
+          <div><label>Precio</label><input type="number" id="item-precio-${idx}" value="0" min="0"></div>
         </div>
         <div class="row between" style="margin-top:8px">
           <div class="row" style="flex:1">
@@ -359,73 +386,44 @@
             <div class="right" style="min-width:140px"><b id="item-total-${idx}">$0</b></div>
             <button class="no-print" onclick="removeItem(${idx})">🗑️</button>
           </div>
-        </div>
-      `;
-
+        </div>`;
       $('items').appendChild(row);
+      const descEl=$('item-desc-'+idx), cantEl=$('item-cant-'+idx), precioEl=$('item-precio-'+idx), totalEl=$('item-total-'+idx), selEl=$('item-sel-'+idx);
+      descEl.oninput=()=>{state.nota.items[idx].descripcion=descEl.value; calcFila(idx,totalEl,cantEl,precioEl);};
+      cantEl.oninput=()=>{state.nota.items[idx].cantidad=Number(cantEl.value||0); calcFila(idx,totalEl,cantEl,precioEl);};
+      precioEl.oninput=()=>{state.nota.items[idx].precio=Number(precioEl.value||0); calcFila(idx,totalEl,cantEl,precioEl);};
+      poblarSelectsProductos(); calc();
+    };
+    function calcFila(idx,totalEl,cantEl,precioEl){const cant=Number(cantEl.value||0), precio=Number(precioEl.value||0); totalEl.textContent=mxn.format(cant*precio); calc();}
+    window.removeItem = (idx)=>{
+      state.nota.items.splice(idx,1); $('items').innerHTML=''; const prev=[...state.nota.items]; state.nota.items=[];
+      prev.forEach(()=>addItem()); prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio; ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));}); calc();
+    };
+    function calc(){const subtotal=(state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0); const desc=subtotal*(Number($('descuento').value||0)/100); const total=Math.max(0,subtotal-desc); $('subtotal').textContent=mxn.format(subtotal); $('descMonto').textContent=mxn.format(desc); $('total').textContent=mxn.format(total);}
 
-      const descEl = $('item-desc-'+idx);
-      const cantEl = $('item-cant-'+idx);
-      const precioEl = $('item-precio-'+idx);
-      const totalEl = $('item-total-'+idx);
-      const selEl = $('item-sel-'+idx);
+    // ===== Historial / folios =====
+    window.guardarHistorial = ()=>{
+      const folioActual=$('folio').textContent, cliente=$('cliente').value||"—", total=$('total').textContent;
+      const hist=JSON.parse(localStorage.getItem(LS.HIST)||"[]"); hist.unshift({folio:folioActual,cliente,total,fecha:new Date().toLocaleDateString("es-MX")}); localStorage.setItem(LS.HIST,JSON.stringify(hist));
+      let folioNum=Number(localStorage.getItem(LS.FOLIO)||1); folioNum++; localStorage.setItem(LS.FOLIO,folioNum);
+      alert("Nota guardada ✅ Nuevo folio: TMP-"+String(folioNum).padStart(4,"0")); location.reload();
+    };
 
-      descEl.oninput = () => { state.nota.items[idx].descripcion = descEl.value; calcFila(idx,totalEl,cantEl,precioEl); };
-      cantEl.oninput = () => { state.nota.items[idx].cantidad = Number(cantEl.value||0); calcFila(idx,totalEl,cantEl,precioEl); };
-      precioEl.oninput = () => { state.nota.items[idx].precio = Number(precioEl.value||0); calcFila(idx,totalEl,cantEl,precioEl); };
-
-      poblarSelectProducto(selEl, descEl, precioEl);
-      calc();
-    }
-    function calcFila(idx,totalEl,cantEl,precioEl){
-      const cant = Number(cantEl.value||0);
-      const precio = Number(precioEl.value||0);
-      totalEl.textContent = mxn.format(cant * precio);
-      calc();
-    }
-    function removeItem(idx){
-      state.nota.items.splice(idx,1);
-      $('items').innerHTML = '';
-      const itemsPrev = [...state.nota.items];
-      state.nota.items = [];
-      itemsPrev.forEach(()=>addItem());
-      itemsPrev.forEach((it,i)=>{
-        $('item-desc-'+i).value = it.descripcion;
-        $('item-cant-'+i).value = it.cantidad;
-        $('item-precio-'+i).value = it.precio;
-        $('item-desc-'+i).dispatchEvent(new Event('input'));
-        $('item-cant-'+i).dispatchEvent(new Event('input'));
-        $('item-precio-'+i).dispatchEvent(new Event('input'));
-      });
-      calc();
-    }
-
-    // ===== Totales =====
-    function calc(){
-      const subtotal = (state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
-      const desc = subtotal * (Number($('descuento').value||0)/100);
-      const total = Math.max(0, subtotal - desc);
-      $('subtotal').textContent = mxn.format(subtotal);
-      $('descMonto').textContent = mxn.format(desc);
-      $('total').textContent = mxn.format(total);
-    }
-
-    // ===== Historial y folios =====
-    function guardarHistorial(){
-      const folioActual = $('folio').textContent;
-      const cliente = $('cliente').value || "—";
-      const total = $('total').textContent;
-      const hist = JSON.parse(localStorage.getItem(LS.HIST) || "[]");
-      hist.unshift({ folio: folioActual, cliente, total, fecha: new Date().toLocaleDateString("es-MX") });
-      localStorage.setItem(LS.HIST, JSON.stringify(hist));
-      let folioNum = Number(localStorage.getItem(LS.FOLIO) || 1);
-      folioNum++;
-      localStorage.setItem(LS.FOLIO, folioNum);
-      alert("Nota guardada ✅ Nuevo folio: TMP-" + String(folioNum).padStart(4,"0"));
-      location.reload();
-    }
+    // Admin toggles
+    window.toggleAdmin = id => { const el=$(id); el.style.display=(el.style.display==='block')?'none':'block'; if(id==='adminClientes') renderAdminClientes(); if(id==='adminProductos') renderAdminProductos(); };
+    // Exportar/Importar JSON local
+    window.exportarCatalogo = tipo => { const data=tipo==='clientes'?state.clientes:state.productos; download(`${tipo}-tmp.json`,JSON.stringify(data,null,2)); };
+    window.importarCatalogo = (e,tipo)=>{
+      const file=e.target.files[0]; if(!file) return;
+      const reader=new FileReader(); reader.onload=async ()=>{
+        try{ const arr=JSON.parse(reader.result||"[]"); if(!Array.isArray(arr)) throw new Error("Formato inválido");
+          if(tipo==='clientes'){ state.clientes=arr; if(state.companyKey){ await Promise.all(arr.map(c=>setDoc(doc(cClientes(),c.nombre),c))); } }
+          else { state.productos=arr; if(state.companyKey){ await Promise.all(arr.map(p=>setDoc(doc(cProductos(),p.nombre),p))); } }
+          guardarCatalogosLocal(); (tipo==='clientes'?renderAdminClientes:renderAdminProductos)(); alert("Catálogo importado ✅");
+        }catch(err){ alert("No se pudo importar: "+err.message); }
+        e.target.value='';
+      }; reader.readAsText(file);
+    };
   </script>
-
 </body>
 </html>
-
