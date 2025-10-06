@@ -40,7 +40,7 @@
     .msg-ok{ color:#0e7a72; background:#e7fbf9; border:1px solid #b7efea; padding:8px 10px; border-radius:8px }
     .msg-err{ color:#8a1e1e; background:#fdecec; border:1px solid #f5bcbc; padding:8px 10px; border-radius:8px }
 
-    /* ---- Estilos de impresión ---- */
+    /* Impresión */
     #printHeader,#printFooter{display:none}
     @media print{
       body{background:#fff}
@@ -116,26 +116,26 @@
       </div>
     </div>
 
+    <!-- TARJETA PRINCIPAL -->
     <div class="card">
+      <!-- Encabezado con datos -->
       <div class="row between">
-  <div>
-    <h3 style="margin:0">TMP Regenerative</h3>
-    <p style="margin:0">Chihuahua, México</p>
-    <p style="margin:0;font-size:13px">
-      RFC: <b>MOVG850703SL4</b> · 
-      Tel: <b>614 176 5850</b><br>
-      Email: <a href="mailto:gmorales.tmp@gmail.com" style="color:#007c89;text-decoration:none;">gmorales.tmp@gmail.com</a>
-    </p>
-  </div>
-  <div style="text-align:right">
-    <img src="./icons/tmp-logo.png" alt="TMP Regenerative" style="height:72px;object-fit:contain">
-    <p style="margin:6px 0 0 0;font-weight:700">Nota de remisión</p>
-    <p id="folio" style="margin:0;font-size:14px">TMP-0001</p>
-    <p id="fecha" style="margin:0;font-size:13px"></p>
-  </div>
-</div>
-
-
+        <div>
+          <h3 style="margin:0">TMP Regenerative</h3>
+          <p style="margin:0">Chihuahua, México</p>
+          <p style="margin:0;font-size:13px">
+            RFC: <b>MOVG850703SL4</b> · 
+            Tel: <b>614 176 5850</b><br>
+            Email: <a href="mailto:gmorales.tmp@gmail.com" style="color:#007c89;text-decoration:none;">gmorales.tmp@gmail.com</a>
+          </p>
+        </div>
+        <div style="text-align:right">
+          <img src="./icons/tmp-logo.png" alt="TMP Regenerative" style="height:72px;object-fit:contain">
+          <p style="margin:6px 0 0 0;font-weight:700">Nota de remisión</p>
+          <p id="folio" style="margin:0;font-size:14px">TMP-0001</p>
+          <p id="fecha" style="margin:0;font-size:13px"></p>
+        </div>
+      </div>
 
       <div class="line"></div>
 
@@ -238,7 +238,15 @@
       onSnapshot, getDocs, query, orderBy, limit, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
-    // Config Firebase (TU proyecto)
+    /* ========= Datos fijos de la empresa ========= */
+    const EMPRESA = {
+      nombre: "TMP Regenerative",
+      rfc: "MOVG850703SL4",
+      tel: "614 176 5850",
+      email: "gmorales.tmp@gmail.com"
+    };
+
+    /* ========= Config Firebase (TU proyecto) ========= */
     const firebaseConfig = {
       apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
       authDomain: "notas-tmp.firebaseapp.com",
@@ -251,31 +259,26 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const EMPRESA = {
-  nombre: "TMP Regenerative",
-  email: "gmorales.tmp@gmail.com"
-};
 
-
-    // ===== Utilidades / UI =====
+    /* ========= Utilidades/UI ========= */
     const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
     const $ = (id)=>document.getElementById(id);
     const download=(name,content)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));a.download=name;a.click();}
-    function showMsg(text, ok=true){
-      const bar=$('msgBar'); if(!bar) return;
-      bar.style.display='block'; bar.className= ok?'msg-ok':'msg-err'; bar.textContent=text;
-      if(ok){ setTimeout(()=>{ bar.style.display='none'; }, 6000); }
-    }
+    function showMsg(text, ok=true){ const bar=$('msgBar'); if(!bar) return; bar.style.display='block'; bar.className= ok?'msg-ok':'msg-err'; bar.textContent=text; if(ok){ setTimeout(()=>{ bar.style.display='none'; }, 6000); } }
     function clearMsg(){ const bar=$('msgBar'); if(bar) bar.style.display='none'; }
 
-    // ===== LocalStorage keys =====
+    // Captura global de errores para diagnóstico
+    window.addEventListener('error', e=>{ showMsg('Error: '+(e.error?.message||e.message), false); });
+    window.addEventListener('unhandledrejection', e=>{ showMsg('Error: '+(e.reason?.message||e.reason), false); });
+
+    /* ========= LocalStorage ========= */
     const LS={FOLIO:"tmp_folio",HIST:"tmp_historial",CLIENTES:"tmp_clientes",PRODUCTOS:"tmp_productos",COMPANY:"tmp_company_key"};
 
-    // ===== Estado =====
+    /* ========= Estado ========= */
     const state={nota:{items:[]},clientes:[],productos:[],histLocal:[],companyKey:localStorage.getItem(LS.COMPANY)||"",histMerged:[]};
     let unsubClientes=null,unsubProductos=null,unsubHist=null;
 
-    // ===== Inicio =====
+    /* ========= Inicio ========= */
     document.addEventListener("DOMContentLoaded", async ()=>{
       $('fecha').textContent=new Date().toLocaleDateString("es-MX");
       const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
@@ -286,34 +289,28 @@
       cargarCatalogosLocal(); cargarHistorialLocal();
       addItem(); calc(); renderHistorial();
 
-      if(state.companyKey){
-        await signIn(); activarListeners(); await primeCloud();
-      }
+      if(state.companyKey){ await signIn(); activarListeners(); await primeCloud(); }
       prepararBarrasImpresion();
     });
 
     const setSyncStatus=(m)=>$('syncStatus').textContent="Estado: "+m;
 
-    // ------- Auth -------
+    /* ========= Auth ========= */
     async function signIn(){
       try{
         const cred = await signInAnonymously(auth);
         const uid = cred.user?.uid || '(sin uid)';
         setSyncStatus(`autenticado UID: ${uid}`);
         return uid;
-      }catch(e){
-        console.error(e);
-        showMsg("No se pudo iniciar sesión anónima. Revisa Authentication → Anonymous.", false);
-        throw e;
-      }
+      }catch(e){ console.error(e); showMsg("No se pudo iniciar sesión anónima. Revisa Authentication → Anonymous.", false); throw e; }
     }
 
-    // Rutas por compañía
+    /* ========= Rutas ========= */
     const colClientes = ()=>collection(db,"companies",state.companyKey,"clientes");
     const colProductos= ()=>collection(db,"companies",state.companyKey,"productos");
     const colHistorial = ()=>collection(db,"companies",state.companyKey,"historial");
 
-    // ------- Listeners -------
+    /* ========= Listeners ========= */
     function activarListeners(){
       if(!state.companyKey) return;
       unsubClientes && unsubClientes(); unsubProductos && unsubProductos(); unsubHist && unsubHist();
@@ -342,7 +339,7 @@
       });
     }
 
-    // Sube catálogos locales si nube está vacía
+    /* ========= Semilla nube si está vacía ========= */
     async function primeCloud(){
       const cSnap=await getDocs(query(colClientes(),limit(1)));
       const pSnap=await getDocs(query(colProductos(),limit(1)));
@@ -350,7 +347,7 @@
       if(pSnap.empty && state.productos.length){ await Promise.all(state.productos.map(p=>setDoc(doc(colProductos(),p.nombre),p))); }
     }
 
-    // ------- Sync UI -------
+    /* ========= Sync UI ========= */
     window.activarSync = async ()=>{
       clearMsg();
       const key=($('companyKey').value||"").trim();
@@ -361,7 +358,7 @@
         activarListeners(); await primeCloud();
         setSyncStatus(`sincronizado (${key}) — UID: ${uid}`);
         showMsg("Sincronización activada ✅", true);
-      }catch(e){ /* signIn ya avisó */ }
+      }catch(e){/* ya se mostró */}
     };
     window.desactivarSync = ()=>{
       localStorage.removeItem(LS.COMPANY); state.companyKey="";
@@ -369,7 +366,7 @@
       setSyncStatus("sin sincronizar"); showMsg("Sincronización desactivada", true);
     };
 
-    // ------- Catálogos Local -------
+    /* ========= Catálogos Local ========= */
     function cargarCatalogosLocal(){
       try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{state.clientes=[]}
       try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{state.productos=[]}
@@ -381,11 +378,11 @@
       poblarClientesUI(); refrescarSelectsProductos();
     }
 
-    // ------- Historial Local -------
+    /* ========= Historial Local ========= */
     function cargarHistorialLocal(){ try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{state.histLocal=[]} }
     function guardarHistorialLocal(arr){ state.histLocal=arr; localStorage.setItem(LS.HIST,JSON.stringify(arr)); }
 
-    // ------- Clientes -------
+    /* ========= Clientes ========= */
     function poblarClientesUI(){
       const sel=$('selCliente');
       sel.innerHTML='<option value="">— Elegir cliente —</option>'+state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
@@ -432,7 +429,7 @@
       renderAdminClientes();
     };
 
-    // ------- Productos -------
+    /* ========= Productos ========= */
     function refrescarSelectsProductos(){
       document.querySelectorAll('.selProducto').forEach((el,idx)=>poblarSelectProducto(el,$('item-desc-'+idx),$('item-precio-'+idx)));
     }
@@ -479,7 +476,7 @@
       renderAdminProductos();
     };
 
-    // ------- Ítems y Totales -------
+    /* ========= Ítems y Totales ========= */
     window.addItem = ()=>{
       const idx=state.nota.items.length;
       state.nota.items.push({id:Date.now()+idx,descripcion:'',cantidad:1,precio:0});
@@ -509,12 +506,23 @@
     };
     function calcFila(idx,totalEl,cantEl,precioEl){const cant=Number(cantEl.value||0),precio=Number(precioEl.value||0); totalEl.textContent=mxn.format(cant*precio); calc();}
     window.removeItem = (idx)=>{
-      state.nota.items.splice(idx,1); $('items').innerHTML=''; const prev=[...state.nota.items]; state.nota.items=[];
-      prev.forEach(()=>addItem()); prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio; ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));}); calc();
+      state.nota.items.splice(idx,1); $('items').innerHTML='';
+      const prev=[...state.nota.items]; state.nota.items=[];
+      prev.forEach(()=>addItem());
+      prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio;
+        ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));});
+      calc();
     };
-    function calc(){const subtotal=(state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0); const desc=subtotal*(Number($('descuento').value||0)/100); const total=Math.max(0,subtotal-desc); $('subtotal').textContent=mxn.format(subtotal); $('descMonto').textContent=mxn.format(desc); $('total').textContent=mxn.format(total);}
+    function calc(){
+      const subtotal=(state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
+      const desc=subtotal*(Number($('descuento').value||0)/100);
+      const total=Math.max(0,subtotal-desc);
+      $('subtotal').textContent=mxn.format(subtotal);
+      $('descMonto').textContent=mxn.format(desc);
+      $('total').textContent=mxn.format(total);
+    }
 
-    // ------- Historial -------
+    /* ========= Historial ========= */
     window.guardarHistorial = async ()=>{
       const snapshot = {
         folio: $('folio').textContent,
@@ -528,12 +536,10 @@
         total: $('total').textContent
       };
 
-      // Local
       const hist=JSON.parse(localStorage.getItem(LS.HIST)||"[]");
       hist.unshift({ ...snapshot });
       guardarHistorialLocal(hist);
 
-      // Nube
       if(state.companyKey){
         try{ await addDoc(colHistorial(), { ...snapshot, ts: serverTimestamp() }); }
         catch(err){ console.error(err); showMsg("Nota guardada localmente, pero no se pudo subir a la nube.", false); }
@@ -614,7 +620,7 @@
       guardarHistorialLocal([]); renderHistorial();
     };
 
-    // ------- Exportar/Importar catálogos -------
+    /* ========= Exportar/Importar ========= */
     window.toggleAdmin = id => { const el=$(id); el.style.display=(el.style.display==='block')?'none':'block'; if(id==='adminClientes') renderAdminClientes(); if(id==='adminProductos') renderAdminProductos(); };
     window.toggleHistorial = ()=>{ const el=$('historialCard'); el.style.display=(el.style.display==='block')?'none':'block'; renderHistorial(); };
     window.exportarCatalogo = tipo => { const data=tipo==='clientes'?state.clientes:state.productos; download(`${tipo}-tmp.json`,JSON.stringify(data,null,2)); };
@@ -630,7 +636,7 @@
       }; reader.readAsText(file);
     };
 
-    // ------- PDF nombrado + Encabezado/Pie -------
+    /* ========= PDF + Encabezado/Pie ========= */
     function nombrePDF(){
       const folio = ($('folio')?.textContent || 'FOLIO').trim().replace(/\s+/g,'');
       const clienteRaw = ($('cliente')?.value || 'Cliente').trim();
@@ -638,21 +644,16 @@
       return `${folio}_${cliente || 'Cliente'}.pdf`;
     }
     function prepararBarrasImpresion(){
-  const build = ()=>{
-    const folio = (document.getElementById('folio')?.textContent||'').trim();
-    const fecha = (document.getElementById('fecha')?.textContent||'').trim();
-    const cliente = (document.getElementById('cliente')?.value||'').trim();
-    const total = (document.getElementById('total')?.textContent||'').trim();
-
-    document.getElementById('printHeader').textContent =
-      `Folio: ${folio}  |  Fecha: ${fecha}  |  Cliente: ${cliente}  |  Email: ${EMPRESA.email}`;
-
-    document.getElementById('printFooter').textContent =
-      `Total: ${total}  •  ${EMPRESA.nombre}`;
-  };
-  window.onbeforeprint = build;
-}
-
+      const build = ()=>{
+        const folio = ($('folio')?.textContent||'').trim();
+        const fecha = ($('fecha')?.textContent||'').trim();
+        const cliente = ($('cliente')?.value||'').trim();
+        const total = ($('total')?.textContent||'').trim();
+        $('printHeader').textContent =
+          `${EMPRESA.nombre}  •  RFC: ${EMPRESA.rfc}  •  Tel: ${EMPRESA.tel}  •  Email: ${EMPRESA.email}  •  Folio: ${folio}  •  Fecha: ${fecha}  •  Cliente: ${cliente}`;
+        $('printFooter').textContent = `Total: ${total}  •  ${EMPRESA.nombre}`;
+      };
+      window.onbeforeprint = build;
     }
     window.exportarPDF = ()=>{
       const prevTitle = document.title;
@@ -664,7 +665,7 @@
       setTimeout(restore, 3000);
     };
 
-    // ------- Probar sync -------
+    /* ========= Probar sync ========= */
     window.probarSync = async ()=>{
       clearMsg();
       if(!state.companyKey){ showMsg("Primero activa sync con una clave.", false); return; }
