@@ -1,270 +1,167 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>Notas TMP</title>
-  <meta name="theme-color" content="#00B5AD">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <!-- Si luego subes un icono: <link rel="apple-touch-icon" href="./icons/icon-192.png"> -->
+  <meta charset="utf-8">
+  <title>Notas TMP Regenerative</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#00b5ad">
   <style>
-    :root{--c:#00B5AD}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f7f9fa;color:#1f2d3d}
-    .wrap{max-width:1100px;margin:24px auto;padding:0 16px}
-    .card{background:#fff;border:1px solid #e6e9ec;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-    .p16{padding:16px}.row{display:flex;gap:12px;flex-wrap:wrap}.col{flex:1 1 260px;min-width:260px}
-    h1{margin:0 0 6px}h2{margin:0 0 8px;font-size:18px}
-    input,textarea,button{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid #d6dbe0;font-size:14px}
-    input:focus,textarea:focus{outline:2px solid #00B5AD22;border-color:var(--c)}
-    button{cursor:pointer;background:var(--c);color:#fff;border:none}button.secondary{background:#eef6f6;color:#116b67}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}.header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
-    .brand{display:flex;align-items:center;gap:12px}.brand-logo{width:48px;height:48px;border-radius:12px;background:var(--c);display:grid;place-items:center;color:#fff;font-weight:700}
-    .muted{color:#6b7785;font-size:12px}.grid{display:grid;grid-template-columns:6fr 2fr 2fr 1fr auto;gap:8px;align-items:center}
-    .right{text-align:right}.line{border-top:2px solid var(--c);width:80px;margin:8px auto 0}.title{color:var(--c);font-weight:800;font-size:22px;text-align:center;margin:4px 0}
-    .total{background:rgba(0,181,173,.1);border-radius:8px;padding:8px 12px}@media print{.no-print{display:none!important}}
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f8fafc;
+      color: #222;
+      padding: 16px;
+      margin: 0;
+    }
+    h1 {
+      text-align: center;
+      color: #00b5ad;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 16px;
+      max-width: 900px;
+      margin: 20px auto;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    input, textarea {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 6px 8px;
+      width: 100%;
+      font-size: 14px;
+    }
+    button {
+      background-color: #00b5ad;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #009f97; }
+    .total {
+      font-weight: bold;
+      font-size: 1.1em;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <div class="brand">
-        <div class="brand-logo">TMP</div>
-        <div>
-          <h1>Notas de Remisión TMP Regenerative</h1>
-          <div class="muted">PWA instalable. Funciona offline y guarda su historial.</div>
-        </div>
-      </div>
-      <div class="actions no-print">
-        <button id="btnGuardar">Guardar / Nuevo folio</button>
-        <button class="secondary" onclick="window.print()">Imprimir / PDF</button>
-        <button class="secondary" id="btnHistorial">Ver historial</button>
-      </div>
-    </div>
 
-    <div class="card p16" style="text-align:center;margin-bottom:16px">
-      <img alt="logo TMP" id="logo" style="width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))"/>
-      <div class="line"></div>
-      <div class="title">NOTA DE REMISIÓN</div>
-      <div class="muted">Folio: <b id="folio"></b> · Fecha: <span id="fecha"></span></div>
-    </div>
+  <h1>Notas de Remisión TMP Regenerative</h1>
 
+  <div class="card">
     <div class="row">
-      <div class="col">
-        <div class="card p16">
-          <h2>Datos de la empresa</h2>
-          <div class="row">
-            <div class="col"><small>Nombre</small><input id="e_nombre"></div>
-            <div class="col"><small>RFC</small><input id="e_rfc"></div>
-            <div class="col"><small>Teléfono</small><input id="e_tel"></div>
-            <div class="col"><small>Dirección</small><input id="e_dir"></div>
-            <div class="col"><small>Email</small><input id="e_email"></div>
-            <div class="col"><small>Logo (URL)</small><input id="e_logo" placeholder="https://…"></div>
-            <div class="col"><small>Prefijo folio</small><input id="e_prefijo"></div>
-            <div class="col"><small>IVA (%)</small><input type="number" id="e_iva"></div>
-          </div>
+      <div>
+        <h3 style="margin:0;">TMP Regenerative</h3>
+        <p style="margin:0;">Chihuahua, México</p>
+      </div>
+      <div><img src="icons/icon-192.png" alt="logo TMP" height="60"></div>
+    </div>
+
+    <hr>
+
+    <div>
+      <label>Cliente</label>
+      <input id="cliente" placeholder="Nombre del cliente">
+    </div>
+    <div>
+      <label>Dirección</label>
+      <input id="direccion" placeholder="Dirección del cliente">
+    </div>
+
+    <hr>
+
+    <h3>Conceptos</h3>
+    <div id="items"></div>
+    <button onclick="addItem()">Agregar concepto</button>
+
+    <div style="margin-top:16px;display:grid;gap:6;max-width:360px;margin-left:auto">
+      <div class="row" style="justify-content:space-between">
+        <span>Subtotal (IVA incluido)</span>
+        <b id="subtotal">$0</b>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>Descuento</div>
+        <div class="row" style="align-items:center">
+          <input style="width:80px;text-align:right" type="number" min="0" max="100" step="0.5" id="descuento" value="0" onchange="calc()">
+          <div style="width:24px;text-align:center">%</div>
+          <div style="width:120px;text-align:right">-<span id="descMonto">$0</span></div>
         </div>
       </div>
-
-      <div class="col">
-        <div class="card p16">
-          <h2>Datos del cliente</h2>
-          <div class="row">
-            <div class="col"><small>Nombre</small><input id="c_nombre"></div>
-            <div class="col"><small>RFC</small><input id="c_rfc"></div>
-            <div class="col"><small>Teléfono</small><input id="c_tel"></div>
-            <div class="col"><small>Email</small><input id="c_email"></div>
-            <div class="col"><small>Dirección</small><input id="c_dir"></div>
-          </div>
-        </div>
+      <div class="row total" style="justify-content:space-between">
+        <span>Total</span>
+        <b id="total">$0</b>
       </div>
     </div>
 
-    <div class="card p16" style="margin-top:16px">
-      <h2>Conceptos</h2>
-      <div id="items"></div>
-      <div class="actions" style="margin-top:8px">
-        <button class="secondary" id="btnAdd">Agregar concepto</button>
-      </div>
-      <div style="margin-top:16px;display:grid;gap:6;max-width:360px;margin-left:auto">
-        <div class="row" style="justify-content:space-between"><span>Subtotal</span><b id="subtotal">$0</b></div>
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div>Descuento</div>
-          <div class="row" style="align-items:center">
-            <input style="width:80px;text-align:right" type="number" min="0" max="100" step="0.5" id="descuento">
-            <div style="width:24px;text-align:center">%</div>
-            <div style="width:120px;text-align:right">-<span id="descMonto">$0</span></div>
-          </div>
-        </div>
-        <div class="row" style="justify-content:space-between"><span>Base</span><b id="base">$0</b></div>
-        function calc(){
-  const n = state.nota;
-  const subtotal = (n.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
-  const desc = subtotal * (Number(n.descuentoPorc||0)/100);
-  const total = Math.max(0, subtotal - desc);
+    <hr>
 
-  $('subtotal').textContent = mxn.format(subtotal);
-  $('descMonto').textContent = mxn.format(desc);
-  $('base').textContent = mxn.format(total);
-  $('total').textContent = mxn.format(total);
-}
+    <textarea id="notas" placeholder="Notas adicionales" rows="3" style="width:100%;"></textarea>
 
-        <div class="row total" style="justify-content:space-between"><span>Total</span><b id="total">$0</b></div>
-      </div>
-    </div>
-
-    <div class="card p16" style="margin-top:16px">
-      <h2>Notas</h2>
-      <textarea rows="4" id="notas"></textarea>
-    </div>
-
-    <div id="hist" class="card p16" style="margin-top:16px;display:none">
-      <h2>Historial</h2>
-      <div id="histList"></div>
-    </div>
   </div>
 
   <script>
-    const LOGO_TMP = "https://tmpregenerative.com/logo-tmp.png";
-    const LS = {DRAFT:'nota_remision_borrador_v1', HIST:'nota_remision_historial_v1'};
-    const mxn = new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'});
-    const todayISO = () => new Date().toISOString().slice(0,10);
-    const uid = () => Math.random().toString(36).slice(2,10);
-    const $ = (id)=>document.getElementById(id);
-    const state = {nota:null};
+    const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+    const $ = (id) => document.getElementById(id);
 
-    function crearNotaBase(){
-      const empresaDefault = JSON.parse(localStorage.getItem('empresa_config_v1')||'null')||{
-        nombre:'TMP Regenerative', rfc:'TMR000101AB1', direccion:'Chihuahua, México', telefono:'+52 614 000 0000', email:'contacto@tmpregenerative.com',
-        logoUrl:LOGO_TMP, folioPrefijo:'TMP-', ivaPorc:16
-      };
-      const consecutivo = Number(localStorage.getItem('folio_consecutivo_v1')||'1');
-      return {
-        id:uid(), folio:`${empresaDefault.folioPrefijo}${String(consecutivo).padStart(4,'0')}`,
-        fecha:todayISO(), cliente:{nombre:'',rfc:'',telefono:'',email:'',direccion:''},
-        empresa:empresaDefault, items:[{id:uid(),descripcion:'',cantidad:1,precio:0}],
-        descuentoPorc:0, aplicaIVA:true, metodoPago:'Transferencia', notas:'Gracias por su preferencia. — TMP Regenerative', vencimiento:todayISO()
-      };
+    const state = {
+      nota: {
+        items: []
+      }
+    };
+
+    function addItem() {
+      const id = Date.now();
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.style.gap = '6px';
+      div.style.marginBottom = '4px';
+      div.id = 'item-' + id;
+      div.innerHTML = `
+        <input style="flex:4" placeholder="Descripción" oninput="updateItem(${id}, 'desc', this.value)">
+        <input type="number" style="flex:1" placeholder="Cant." value="1" oninput="updateItem(${id}, 'cant', this.value)">
+        <input type="number" style="flex:2" placeholder="Precio" value="0" oninput="updateItem(${id}, 'precio', this.value)">
+        <button onclick="removeItem(${id})">🗑️</button>
+      `;
+      $('items').appendChild(div);
+      state.nota.items.push({ id, descripcion:'', cantidad:1, precio:0 });
     }
 
-    function load(){
-      try{ state.nota = JSON.parse(localStorage.getItem(LS.DRAFT)) || crearNotaBase(); }catch{ state.nota = crearNotaBase(); }
-      paint();
-    }
-
-    function paint(){
-      const n = state.nota;
-      $('logo').src = n.empresa.logoUrl||LOGO_TMP;
-      $('folio').textContent = n.folio;
-      $('fecha').textContent = n.fecha;
-
-      $('e_nombre').value = n.empresa.nombre; $('e_rfc').value = n.empresa.rfc; $('e_tel').value = n.empresa.telefono; $('e_dir').value = n.empresa.direccion;
-      $('e_email').value = n.empresa.email; $('e_logo').value = n.empresa.logoUrl; $('e_prefijo').value = n.empresa.folioPrefijo; $('e_iva').value = n.empresa.ivaPorc;
-      $('c_nombre').value = n.cliente.nombre; $('c_rfc').value = n.cliente.rfc; $('c_tel').value = n.cliente.telefono; $('c_email').value = n.cliente.email; $('c_dir').value = n.cliente.direccion;
-      $('descuento').value = n.descuentoPorc; $('notas').value = n.notas; $('ivaLbl').textContent = `(${n.empresa.ivaPorc}%)`;
-
-      const cont = $('items'); cont.innerHTML='';
-      n.items.forEach((it,idx)=>{
-        const row = document.createElement('div'); row.className='grid';
-        row.innerHTML = `
-          <input placeholder="Descripción (${idx+1})" value="${it.descripcion}">
-          <input type="number" value="${it.cantidad}">
-          <input type="number" value="${it.precio}">
-          <div class="right">${mxn.format((it.cantidad||0)*(it.precio||0))}</div>
-          <div class="right"><button class="secondary">✕</button></div>`;
-        const [desc,cant,prec,tot,del] = row.children;
-        desc.oninput = e=>{ it.descripcion=e.target.value; save(); };
-        cant.oninput = e=>{ it.cantidad=Number(e.target.value||0); save(); };
-        prec.oninput = e=>{ it.precio=Number(e.target.value||0); save(); };
-        del.onclick = ()=>{ n.items = n.items.filter(x=>x!==it); save(); };
-        cont.appendChild(row);
-      });
-
+    function updateItem(id, field, value) {
+      const item = state.nota.items.find(i => i.id === id);
+      if (!item) return;
+      if (field === 'desc') item.descripcion = value;
+      if (field === 'cant') item.cantidad = Number(value);
+      if (field === 'precio') item.precio = Number(value);
       calc();
-      attachInputs();
-      save(false);
     }
 
-    function attachInputs(){
-      const n = state.nota;
-      $('e_nombre').oninput = e=>{n.empresa.nombre=e.target.value; save(false);} ;
-      $('e_rfc').oninput = e=>{n.empresa.rfc=e.target.value; save(false);} ;
-      $('e_tel').oninput = e=>{n.empresa.telefono=e.target.value; save(false);} ;
-      $('e_dir').oninput = e=>{n.empresa.direccion=e.target.value; save(false);} ;
-      $('e_email').oninput = e=>{n.empresa.email=e.target.value; save(false);} ;
-      $('e_logo').oninput = e=>{n.empresa.logoUrl=e.target.value; $('logo').src=n.empresa.logoUrl; save(false);} ;
-      $('e_prefijo').oninput = e=>{n.empresa.folioPrefijo=e.target.value; save(false);} ;
-      $('e_iva').oninput = e=>{n.empresa.ivaPorc=Number(e.target.value||0); $('ivaLbl').textContent=`(${n.empresa.ivaPorc}%)`; calc(); save(false);} ;
-
-      $('c_nombre').oninput = e=>{n.cliente.nombre=e.target.value; save(false);} ;
-      $('c_rfc').oninput = e=>{n.cliente.rfc=e.target.value; save(false);} ;
-      $('c_tel').oninput = e=>{n.cliente.telefono=e.target.value; save(false);} ;
-      $('c_email').oninput = e=>{n.cliente.email=e.target.value; save(false);} ;
-      $('c_dir').oninput = e=>{n.cliente.direccion=e.target.value; save(false);} ;
-
-      $('descuento').oninput = e=>{n.descuentoPorc=Number(e.target.value||0); calc(); save(false);} ;
-      $('notas').oninput = e=>{n.notas=e.target.value; save(false);} ;
-
-      $('btnAdd').onclick = ()=>{ n.items.push({id:uid(),descripcion:'',cantidad:1,precio:0}); paint(); };
-      $('btnGuardar').onclick = guardar;
-      $('btnHistorial').onclick = toggleHistorial;
+    function removeItem(id) {
+      state.nota.items = state.nota.items.filter(i => i.id !== id);
+      document.getElementById('item-' + id)?.remove();
+      calc();
     }
 
     function calc(){
       const n = state.nota;
       const subtotal = (n.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
-      const desc = subtotal * (Number(n.descuentoPorc||0)/100);
-      const base = Math.max(0, subtotal - desc);
-      const iva = base * (Number(n.empresa.ivaPorc||16)/100);
-      const total = base + iva;
+      const desc = subtotal * (Number($('descuento').value||0)/100);
+      const total = Math.max(0, subtotal - desc);
+
       $('subtotal').textContent = mxn.format(subtotal);
       $('descMonto').textContent = mxn.format(desc);
-      $('base').textContent = mxn.format(base);
-      $('ivaMonto').textContent = mxn.format(iva);
       $('total').textContent = mxn.format(total);
     }
-
-    function save(updateCalc=true){
-      localStorage.setItem(LS.DRAFT, JSON.stringify(state.nota));
-      if(updateCalc) calc();
-    }
-
-    function guardar(){
-      const n = state.nota;
-      const match = (n.folio.match(/(\\d+)$/)||[])[1];
-      if(match){ localStorage.setItem('folio_consecutivo_v1', String(Number(match)+1)); }
-      const hist = JSON.parse(localStorage.getItem(LS.HIST)||'[]');
-      hist.unshift({...n, id:uid()});
-      localStorage.setItem(LS.HIST, JSON.stringify(hist));
-      state.nota = crearNotaBase();
-      paint();
-    }
-
-    function toggleHistorial(){
-      const div = $('hist');
-      const visible = div.style.display !== 'none';
-      if(visible){ div.style.display='none'; return; }
-      const hist = JSON.parse(localStorage.getItem(LS.HIST)||'[]');
-      const list = $('histList'); list.innerHTML='';
-      hist.forEach(n=>{
-        const subtotal = (n.items||[]).reduce((acc,it)=>acc+(Number(it.cantidad||0)*Number(it.precio||0)),0);
-        const total = subtotal*(1-Number(n.descuentoPorc||0)/100)*(n.aplicaIVA?(1+Number(n.empresa?.ivaPorc||16)/100):1);
-        const row = document.createElement('div');
-        row.className='row';
-        row.style.cssText='justify-content:space-between;border-top:1px solid #eee;padding-top:8px;margin-top:8px';
-        row.innerHTML = `<div><b>${n.folio}</b> · ${n.fecha} · ${n.cliente?.nombre||"—"} · ${(n.items||[]).length} conceptos</div>
-                          <div>${mxn.format(total)}</div>
-                          <div><button class="secondary">Abrir</button></div>`;
-        row.lastElementChild.firstElementChild.onclick = ()=>{ state.nota = n; paint(); div.style.display='none'; };
-        list.appendChild(row);
-      });
-      div.style.display='block';
-    }
-
-    // Service Worker: usar ruta relativa para que funcione en GitHub Pages (/usuario/repositorio/)
-    if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
-    load()
   </script>
+
 </body>
 </html>
