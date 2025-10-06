@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <title>Notas TMP Regenerative</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#00b5ad">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
-  <meta name="theme-color" content="#00b5ad">
   <style>
     body {
       font-family: system-ui, sans-serif;
       background: #f8fafc;
       color: #222;
-      padding: 16px;
       margin: 0;
+      padding: 16px;
     }
     h1 {
       text-align: center;
@@ -32,13 +32,6 @@
       align-items: center;
       justify-content: space-between;
     }
-    input, textarea {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 6px 8px;
-      width: 100%;
-      font-size: 14px;
-    }
     button {
       background-color: #00b5ad;
       color: white;
@@ -48,9 +41,21 @@
       cursor: pointer;
     }
     button:hover { background-color: #009f97; }
+    input, textarea {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 6px 8px;
+      width: 100%;
+      font-size: 14px;
+    }
     .total {
       font-weight: bold;
       font-size: 1.1em;
+    }
+    @media print {
+      button, #acciones { display: none !important; }
+      body { background: white; }
+      .card { box-shadow: none; }
     }
   </style>
 </head>
@@ -58,13 +63,23 @@
 
   <h1>Notas de Remisión TMP Regenerative</h1>
 
+  <div id="acciones" style="text-align:center;margin-bottom:16px;">
+    <button onclick="guardarHistorial()">💾 Guardar / Nuevo folio</button>
+    <button onclick="window.print()">🖨️ Imprimir / PDF</button>
+  </div>
+
   <div class="card">
     <div class="row">
       <div>
         <h3 style="margin:0;">TMP Regenerative</h3>
         <p style="margin:0;">Chihuahua, México</p>
       </div>
-      <div><img src="icons/icon-192.png" alt="logo TMP" height="60"></div>
+      <div style="text-align:right">
+        <img src="icons/icon-192.png" alt="TMP" height="60">
+        <p style="margin:4px 0 0 0;font-weight:bold">Nota de remisión</p>
+        <p id="folio" style="margin:0;font-size:14px;">TMP-0001</p>
+        <p id="fecha" style="margin:0;font-size:13px;"></p>
+      </div>
     </div>
 
     <hr>
@@ -85,11 +100,8 @@
     <button onclick="addItem()">Agregar concepto</button>
 
     <div style="margin-top:16px;display:grid;gap:6;max-width:360px;margin-left:auto">
-      <div class="row" style="justify-content:space-between">
-        <span>Subtotal (IVA incluido)</span>
-        <b id="subtotal">$0</b>
-      </div>
-      <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="row"><span>Subtotal (IVA incluido)</span><b id="subtotal">$0</b></div>
+      <div class="row" style="align-items:center">
         <div>Descuento</div>
         <div class="row" style="align-items:center">
           <input style="width:80px;text-align:right" type="number" min="0" max="100" step="0.5" id="descuento" value="0" onchange="calc()">
@@ -97,27 +109,29 @@
           <div style="width:120px;text-align:right">-<span id="descMonto">$0</span></div>
         </div>
       </div>
-      <div class="row total" style="justify-content:space-between">
-        <span>Total</span>
-        <b id="total">$0</b>
-      </div>
+      <div class="row total"><span>Total</span><b id="total">$0</b></div>
     </div>
 
     <hr>
-
     <textarea id="notas" placeholder="Notas adicionales" rows="3" style="width:100%;"></textarea>
-
   </div>
 
   <script>
     const mxn = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
+
+    const LS_KEYS = { FOLIO: "tmp_folio", HIST: "tmp_historial" };
 
     const state = {
-      nota: {
-        items: []
-      }
+      nota: { items: [] }
     };
+
+    document.addEventListener("DOMContentLoaded", ()=>{
+      $('fecha').textContent = new Date().toLocaleDateString("es-MX");
+      const folioNum = Number(localStorage.getItem(LS_KEYS.FOLIO) || 1);
+      $('folio').textContent = "TMP-" + String(folioNum).padStart(4,"0");
+      addItem();
+    });
 
     function addItem() {
       const id = Date.now();
@@ -156,10 +170,23 @@
       const subtotal = (n.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
       const desc = subtotal * (Number($('descuento').value||0)/100);
       const total = Math.max(0, subtotal - desc);
-
       $('subtotal').textContent = mxn.format(subtotal);
       $('descMonto').textContent = mxn.format(desc);
       $('total').textContent = mxn.format(total);
+    }
+
+    function guardarHistorial(){
+      const folioActual = $('folio').textContent;
+      const cliente = $('cliente').value || "—";
+      const total = $('total').textContent;
+      const hist = JSON.parse(localStorage.getItem(LS_KEYS.HIST) || "[]");
+      hist.unshift({ folio: folioActual, cliente, total, fecha: new Date().toLocaleDateString("es-MX") });
+      localStorage.setItem(LS_KEYS.HIST, JSON.stringify(hist));
+      let folioNum = Number(localStorage.getItem(LS_KEYS.FOLIO) || 1);
+      folioNum++;
+      localStorage.setItem(LS_KEYS.FOLIO, folioNum);
+      alert("Nota guardada ✅ Nuevo folio: TMP-" + String(folioNum).padStart(4,"0"));
+      location.reload();
     }
   </script>
 
