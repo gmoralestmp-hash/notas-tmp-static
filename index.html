@@ -633,15 +633,21 @@
       return `${folio}_${cliente || 'Cliente'}.pdf`;
     }
     function prepararBarrasImpresion(){
-      const build = ()=>{
-        const folio = ($('folio')?.textContent||'').trim();
-        const fecha = ($('fecha')?.textContent||'').trim();
-        const cliente = ($('cliente')?.value||'').trim();
-        const total = ($('total')?.textContent||'').trim();
-        $('printHeader').textContent = `Folio: ${folio}  |  Fecha: ${fecha}  |  Cliente: ${cliente}`;
-        $('printFooter').textContent = `Total: ${total}  •  TMP Regenerative`;
-      };
-      window.onbeforeprint = build;
+  const build = ()=>{
+    const folio = (document.getElementById('folio')?.textContent||'').trim();
+    const fecha = (document.getElementById('fecha')?.textContent||'').trim();
+    const cliente = (document.getElementById('cliente')?.value||'').trim();
+    const total = (document.getElementById('total')?.textContent||'').trim();
+
+    document.getElementById('printHeader').textContent =
+      `Folio: ${folio}  |  Fecha: ${fecha}  |  Cliente: ${cliente}  |  Email: ${EMPRESA.email}`;
+
+    document.getElementById('printFooter').textContent =
+      `Total: ${total}  •  ${EMPRESA.nombre}`;
+  };
+  window.onbeforeprint = build;
+}
+
     }
     window.exportarPDF = ()=>{
       const prevTitle = document.title;
