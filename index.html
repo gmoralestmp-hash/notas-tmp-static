@@ -188,7 +188,8 @@
         <h3 style="margin:6px 0">Conceptos</h3>
         <div class="row">
           <button class="secondary no-print" onclick="toggleAdmin('adminProductos')">⚙️ Administrar productos</button>
-          <button class="secondary no-print" onclick="addItem()">➕ Agregar concepto</button>
+          <!-- Botón sin onclick: lo enganchamos por JS para Safari -->
+          <button id="btnAddConcepto" class="secondary no-print">➕ Agregar concepto</button>
         </div>
       </div>
 
@@ -246,7 +247,10 @@
       email: "gmorales.tmp@gmail.com"
     };
 
-    /* ========= Config Firebase (TU proyecto) ========= */
+    /* ========= Defaults ========= */
+    const DEFAULT_DESC = "Consulta médica";
+
+    /* ========= Config Firebase ========= */
     const firebaseConfig = {
       apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
       authDomain: "notas-tmp.firebaseapp.com",
@@ -287,11 +291,31 @@
       setSyncStatus(state.companyKey?`Con clave: ${state.companyKey}`:"sin sincronizar");
 
       cargarCatalogosLocal(); cargarHistorialLocal();
-      addItem(); calc(); renderHistorial();
+
+      // Hook de botón Agregar (Safari-friendly)
+      hookAddButton();
+
+      // Siempre al menos 1 fila (con descripción por defecto)
+      ensureAtLeastOneItem();
+      calc(); renderHistorial();
 
       if(state.companyKey){ await signIn(); activarListeners(); await primeCloud(); }
       prepararBarrasImpresion();
     });
+
+    /* ========= Hooks ========= */
+    function hookAddButton(){
+      const btn = document.getElementById('btnAddConcepto');
+      if (!btn) return;
+      btn.addEventListener('click', (ev)=>{
+        ev.preventDefault();
+        if (typeof window.addItem === 'function') {
+          window.addItem();
+        } else {
+          showMsg("No se cargó la función para agregar conceptos. Recarga con ?v=fix5 o limpia caché.", false);
+        }
+      }, { passive: true });
+    }
 
     const setSyncStatus=(m)=>$('syncStatus').textContent="Estado: "+m;
 
@@ -508,11 +532,28 @@
     window.removeItem = (idx)=>{
       state.nota.items.splice(idx,1); $('items').innerHTML='';
       const prev=[...state.nota.items]; state.nota.items=[];
-      prev.forEach(()=>addItem());
-      prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio;
-        ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));});
-      calc();
+      if (prev.length === 0) { addItem(); }
+      else {
+        prev.forEach(()=>addItem());
+        prev.forEach((it,i)=>{ $('item-desc-'+i).value=it.descripcion; $('item-cant-'+i).value=it.cantidad; $('item-precio-'+i).value=it.precio;
+          ['desc','cant','precio'].forEach(k=>$('item-'+k+'-'+i).dispatchEvent(new Event('input')));});
+      }
+      calc(); ensureAtLeastOneItem();
     };
+
+    function ensureAtLeastOneItem(){
+      const hasRows = document.querySelector('[id^="item-desc-"]');
+      if (!hasRows && typeof window.addItem === 'function') {
+        window.addItem();
+      }
+      // poner descripción por defecto en la primera fila si está vacía
+      const d = document.getElementById('item-desc-0');
+      if (d && !d.value) {
+        d.value = DEFAULT_DESC;
+        d.dispatchEvent(new Event('input'));
+      }
+    }
+
     function calc(){
       const subtotal=(state.nota.items||[]).reduce((a,it)=>a+(Number(it.cantidad||0)*Number(it.precio||0)),0);
       const desc=subtotal*(Number($('descuento').value||0)/100);
@@ -520,6 +561,7 @@
       $('subtotal').textContent=mxn.format(subtotal);
       $('descMonto').textContent=mxn.format(desc);
       $('total').textContent=mxn.format(total);
+      ensureAtLeastOneItem();
     }
 
     /* ========= Historial ========= */
