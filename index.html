@@ -246,6 +246,11 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const EMPRESA = {
+  nombre: "TMP Regenerative",
+  email: "gmorales.tmp@gmail.com"
+};
+
 
     // ===== Utilidades / UI =====
     const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
