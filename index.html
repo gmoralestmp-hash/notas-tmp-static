@@ -19,6 +19,7 @@
     .actions { text-align:center; margin-bottom:16px; }
     button { background:var(--c); color:#fff; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; }
     button.secondary { background:#e6f7f6; color:#0d6662; }
+    button.danger { background:#e55252; }
     button:hover { opacity:.95 }
     input, textarea, select { border:1px solid #cfd6de; border-radius:8px; padding:8px 10px; width:100%; font-size:14px; }
     .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -26,7 +27,11 @@
     .line { border-top:1px solid #e5e7eb; margin:12px 0; }
     .total { font-weight:700; }
     .right { text-align:right; }
-    @media print { #acciones, .no-print { display:none!important } body{ background:#fff } .card{ box-shadow:none } }
+    .admin { display:none; padding:12px; border:1px dashed #cfd6de; border-radius:10px; background:#fafcff; margin-top:8px; }
+    .admin h4{ margin:0 0 8px 0; }
+    .admin-list .row{ justify-content:space-between; padding:6px 0; border-bottom:1px solid #eef2f6; }
+    .admin-list .row:last-child{ border-bottom:none; }
+    @media print { #acciones, .no-print, .admin { display:none!important } body{ background:#fff } .card{ box-shadow:none } }
   </style>
 </head>
 <body>
@@ -66,7 +71,10 @@
       <div class="row" style="align-items:end">
         <div style="flex:1">
           <label>&nbsp;</label>
-          <button class="secondary" style="width:100%" onclick="guardarClienteActual()">📇 Guardar cliente actual</button>
+          <div class="row">
+            <button class="secondary" style="flex:1" onclick="guardarClienteActual()">📇 Guardar cliente actual</button>
+            <button class="secondary" style="flex:1" onclick="toggleAdmin('adminClientes')">⚙️ Administrar</button>
+          </div>
         </div>
       </div>
       <div>
@@ -79,15 +87,46 @@
       </div>
     </div>
 
+    <!-- Admin clientes -->
+    <div id="adminClientes" class="admin no-print">
+      <h4>Clientes guardados</h4>
+      <div id="listaClientes" class="admin-list"></div>
+      <div class="row between" style="margin-top:8px">
+        <div class="row" style="gap:6px">
+          <button class="secondary" onclick="exportarCatalogo('clientes')">⬇️ Exportar</button>
+          <input type="file" id="importClientesFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'clientes')">
+          <button class="secondary" onclick="document.getElementById('importClientesFile').click()">⬆️ Importar</button>
+        </div>
+        <button class="danger" onclick="borrarTodosClientes()">🗑️ Borrar todos</button>
+      </div>
+    </div>
+
     <div class="line"></div>
 
     <!-- CONCEPTOS -->
     <div class="row between">
       <h3 style="margin:6px 0">Conceptos</h3>
-      <button class="secondary no-print" onclick="addItem()">➕ Agregar concepto</button>
+      <div class="row">
+        <button class="secondary no-print" onclick="toggleAdmin('adminProductos')">⚙️ Administrar productos</button>
+        <button class="secondary no-print" onclick="addItem()">➕ Agregar concepto</button>
+      </div>
     </div>
 
     <div id="items"></div>
+
+    <!-- Admin productos -->
+    <div id="adminProductos" class="admin no-print">
+      <h4>Productos guardados</h4>
+      <div id="listaProductos" class="admin-list"></div>
+      <div class="row between" style="margin-top:8px">
+        <div class="row" style="gap:6px">
+          <button class="secondary" onclick="exportarCatalogo('productos')">⬇️ Exportar</button>
+          <input type="file" id="importProductosFile" accept="application/json" style="display:none" onchange="importarCatalogo(event,'productos')">
+          <button class="secondary" onclick="document.getElementById('importProductosFile').click()">⬆️ Importar</button>
+        </div>
+        <button class="danger" onclick="borrarTodosProductos()">🗑️ Borrar todos</button>
+      </div>
+    </div>
 
     <div class="line"></div>
 
@@ -120,6 +159,11 @@
     // ===== Utilidades =====
     const mxn = new Intl.NumberFormat("es-MX", { style:"currency", currency:"MXN" });
     const $ = id => document.getElementById(id);
+    const download = (name, content) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content],{type:'application/json'}));
+      a.download = name; a.click();
+    };
 
     // ===== Claves de almacenamiento =====
     const LS = {
@@ -147,6 +191,15 @@
       calc();
     });
 
+    // ===== Mostrar/Ocultar secciones admin =====
+    function toggleAdmin(id){
+      const el = $(id);
+      el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+      if(id === 'adminClientes') renderAdminClientes();
+      if(id === 'adminProductos') renderAdminProductos();
+    }
+
+    // ===== Catálogos =====
     function cargarCatalogos(){
       try { state.clientes = JSON.parse(localStorage.getItem(LS.CLIENTES) || "[]"); } catch { state.clientes = []; }
       try { state.productos = JSON.parse(localStorage.getItem(LS.PRODUCTOS) || "[]"); } catch { state.productos = []; }
@@ -154,7 +207,6 @@
       const sel = $('selCliente');
       sel.innerHTML = '<option value="">— Elegir cliente —</option>' + state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
     }
-
     function guardarCatalogos(){
       localStorage.setItem(LS.CLIENTES, JSON.stringify(state.clientes));
       localStorage.setItem(LS.PRODUCTOS, JSON.stringify(state.productos));
@@ -171,21 +223,41 @@
       $('cliente').value = c?.nombre || '';
       $('direccion').value = c?.direccion || '';
     }
-
     function guardarClienteActual(){
       const nombre = ($('cliente').value || '').trim();
       const direccion = ($('direccion').value || '').trim();
       if(!nombre){ alert("Escribe el nombre del cliente para guardarlo."); return; }
-      // evita duplicados por nombre (insensible a mayúsculas)
       const exists = state.clientes.some(c => c.nombre.toLowerCase() === nombre.toLowerCase());
       if(!exists) state.clientes.unshift({ nombre, direccion });
-      else alert("Actualicé el cliente existente.");
+      else state.clientes = state.clientes.map(c=>c.nombre.toLowerCase()===nombre.toLowerCase()?({...c,direccion}):c);
       guardarCatalogos();
+      alert("Cliente guardado ✅");
+    }
+    function renderAdminClientes(){
+      const cont = $('listaClientes'); cont.innerHTML = '';
+      if(state.clientes.length===0){ cont.innerHTML = '<div class="muted">No hay clientes guardados.</div>'; return; }
+      state.clientes.forEach((c,i)=>{
+        const row = document.createElement('div');
+        row.className='row';
+        row.innerHTML = `<div><b>${c.nombre}</b><br><small>${c.direccion||'—'}</small></div>
+                         <button class="danger" onclick="eliminarCliente(${i})">Eliminar</button>`;
+        cont.appendChild(row);
+      });
+    }
+    function eliminarCliente(i){
+      state.clientes.splice(i,1);
+      guardarCatalogos();
+      renderAdminClientes();
+    }
+    function borrarTodosClientes(){
+      if(!confirm("¿Borrar todos los clientes guardados?")) return;
+      state.clientes = [];
+      guardarCatalogos();
+      renderAdminClientes();
     }
 
     // ===== Productos =====
     function poblarSelectProducto(selectEl, descEl, precioEl){
-      // llena opciones
       selectEl.innerHTML = '<option value="">— Producto —</option>' + state.productos.map((p,i)=>`<option value="${i}">${p.nombre} (${mxn.format(p.precio)})</option>`).join('');
       selectEl.onchange = () => {
         const idx = selectEl.value;
@@ -193,25 +265,64 @@
         const p = state.productos[Number(idx)];
         descEl.value = p.nombre;
         precioEl.value = p.precio;
-        // dispara update
         descEl.dispatchEvent(new Event('input'));
         precioEl.dispatchEvent(new Event('input'));
       };
     }
-
     function guardarProductoDesdeFila(idx){
       const desc = $('item-desc-'+idx).value.trim();
       const precio = Number($('item-precio-'+idx).value || 0);
       if(!desc){ alert("Escribe la descripción del producto para guardarlo."); return; }
-      // evita duplicados por nombre
       const exists = state.productos.some(p => p.nombre.toLowerCase() === desc.toLowerCase());
       if(!exists) state.productos.unshift({ nombre: desc, precio });
-      else {
-        // si existe, actualiza precio
-        state.productos = state.productos.map(p => p.nombre.toLowerCase() === desc.toLowerCase() ? ({ ...p, precio }) : p);
-      }
+      else state.productos = state.productos.map(p => p.nombre.toLowerCase() === desc.toLowerCase() ? ({ ...p, precio }) : p);
       guardarCatalogos();
-      alert("Producto guardado en catálogo ✅");
+      alert("Producto guardado ✅");
+    }
+    function renderAdminProductos(){
+      const cont = $('listaProductos'); cont.innerHTML = '';
+      if(state.productos.length===0){ cont.innerHTML = '<div class="muted">No hay productos guardados.</div>'; return; }
+      state.productos.forEach((p,i)=>{
+        const row = document.createElement('div');
+        row.className='row';
+        row.innerHTML = `<div><b>${p.nombre}</b><br><small>${mxn.format(p.precio)}</small></div>
+                         <button class="danger" onclick="eliminarProducto(${i})">Eliminar</button>`;
+        cont.appendChild(row);
+      });
+    }
+    function eliminarProducto(i){
+      state.productos.splice(i,1);
+      guardarCatalogos();
+      renderAdminProductos();
+    }
+    function borrarTodosProductos(){
+      if(!confirm("¿Borrar todos los productos guardados?")) return;
+      state.productos = [];
+      guardarCatalogos();
+      renderAdminProductos();
+    }
+
+    // ===== Exportar / Importar catálogos (JSON) =====
+    function exportarCatalogo(tipo){
+      const data = tipo==='clientes' ? state.clientes : state.productos;
+      download(`${tipo}-tmp.json`, JSON.stringify(data, null, 2));
+    }
+    function importarCatalogo(e,tipo){
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const arr = JSON.parse(reader.result||"[]");
+          if(!Array.isArray(arr)) throw new Error("Formato inválido");
+          if(tipo==='clientes') state.clientes = arr;
+          else state.productos = arr;
+          guardarCatalogos();
+          if(tipo==='clientes') renderAdminClientes(); else renderAdminProductos();
+          alert("Catálogo importado ✅");
+        }catch(err){ alert("No se pudo importar: " + err.message); }
+        e.target.value = '';
+      };
+      reader.readAsText(file);
     }
 
     // ===== Ítems =====
@@ -253,7 +364,6 @@
 
       $('items').appendChild(row);
 
-      // Enlaces y eventos
       const descEl = $('item-desc-'+idx);
       const cantEl = $('item-cant-'+idx);
       const precioEl = $('item-precio-'+idx);
@@ -267,22 +377,18 @@
       poblarSelectProducto(selEl, descEl, precioEl);
       calc();
     }
-
     function calcFila(idx,totalEl,cantEl,precioEl){
       const cant = Number(cantEl.value||0);
       const precio = Number(precioEl.value||0);
       totalEl.textContent = mxn.format(cant * precio);
       calc();
     }
-
     function removeItem(idx){
       state.nota.items.splice(idx,1);
-      // reconstruir lista para mantener índices coherentes
       $('items').innerHTML = '';
       const itemsPrev = [...state.nota.items];
       state.nota.items = [];
       itemsPrev.forEach(()=>addItem());
-      // rellenar valores de nuevo
       itemsPrev.forEach((it,i)=>{
         $('item-desc-'+i).value = it.descripcion;
         $('item-cant-'+i).value = it.cantidad;
@@ -322,3 +428,4 @@
 
 </body>
 </html>
+
