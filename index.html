@@ -55,6 +55,8 @@
       .page{padding-top:64px; padding-bottom:56px}
       .card, .item-card{page-break-inside:avoid}
       .line{page-break-after:auto}
+      /* Logo más grande SOLO al imprimir */
+      #logoImg{ height:110px !important; }
     }
   </style>
 </head>
@@ -130,9 +132,9 @@
           </p>
         </div>
         <div style="text-align:right">
-          <img src="./icons/tmp-logo.png" alt="TMP Regenerative" style="height:72px;object-fit:contain">
+          <img id="logoImg" src="./icons/tmp-logo.png" alt="TMP Regenerative" style="height:72px;object-fit:contain">
           <p style="margin:6px 0 0 0;font-weight:700">Nota de remisión</p>
-          <p id="folio" style="margin:0;font-size:14px">TMP-0001</p>
+          <p id="folio" style="margin:0;font-size:14px">TMP-CHIH-0001</p>
           <p id="fecha" style="margin:0;font-size:13px"></p>
         </div>
       </div>
@@ -239,16 +241,15 @@
       onSnapshot, getDocs, query, orderBy, limit, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
-    /* ========= Datos fijos de la empresa ========= */
+    /* ========= Configurables ========= */
     const EMPRESA = {
       nombre: "TMP Regenerative",
       rfc: "MOVG850703SL4",
       tel: "614 176 5850",
       email: "gmorales.tmp@gmail.com"
     };
-
-    /* ========= Defaults ========= */
     const DEFAULT_DESC = "Consulta médica";
+    const FOLIO_PREF = "TMP-CHIH-";
 
     /* ========= Config Firebase ========= */
     const firebaseConfig = {
@@ -270,8 +271,6 @@
     const download=(name,content)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'application/json'}));a.download=name;a.click();}
     function showMsg(text, ok=true){ const bar=$('msgBar'); if(!bar) return; bar.style.display='block'; bar.className= ok?'msg-ok':'msg-err'; bar.textContent=text; if(ok){ setTimeout(()=>{ bar.style.display='none'; }, 6000); } }
     function clearMsg(){ const bar=$('msgBar'); if(bar) bar.style.display='none'; }
-
-    // Captura global de errores para diagnóstico
     window.addEventListener('error', e=>{ showMsg('Error: '+(e.error?.message||e.message), false); });
     window.addEventListener('unhandledrejection', e=>{ showMsg('Error: '+(e.reason?.message||e.reason), false); });
 
@@ -286,7 +285,7 @@
     document.addEventListener("DOMContentLoaded", async ()=>{
       $('fecha').textContent=new Date().toLocaleDateString("es-MX");
       const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
-      $('folio').textContent="TMP-"+String(folioNum).padStart(4,"0");
+      $('folio').textContent = FOLIO_PREF + String(folioNum).padStart(4,"0");
       $('companyKey').value=state.companyKey;
       setSyncStatus(state.companyKey?`Con clave: ${state.companyKey}`:"sin sincronizar");
 
@@ -312,7 +311,7 @@
         if (typeof window.addItem === 'function') {
           window.addItem();
         } else {
-          showMsg("No se cargó la función para agregar conceptos. Recarga con ?v=fix5 o limpia caché.", false);
+          showMsg("No se cargó la función para agregar conceptos. Recarga con ?v=final1 o limpia caché.", false);
         }
       }, { passive: true });
     }
@@ -588,7 +587,7 @@
       }
 
       let folioNum=Number(localStorage.getItem(LS.FOLIO)||1); folioNum++; localStorage.setItem(LS.FOLIO,folioNum);
-      alert("Nota guardada ✅ Nuevo folio: TMP-"+String(folioNum).padStart(4,"0"));
+      alert("Nota guardada ✅ Nuevo folio: " + FOLIO_PREF + String(folioNum).padStart(4, "0"));
       location.reload();
     };
 
