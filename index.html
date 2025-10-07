@@ -1,41 +1,93 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>Notas TMP Regenerative</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#00b5ad" />
-  <link rel="icon" href="icons/icon-192.png" />
-  <style>
-    :root{--c:#00b5ad}
-    body{font-family:system-ui,sans-serif;background:#f8fafc;color:#222;margin:0}
-    h1{text-align:center;color:var(--c);margin:16px 0}
-    .card{background:#fff;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.1);padding:16px;max-width:900px;margin:20px auto}
-    button{background:var(--c);color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
-    button.secondary{background:#e6f7f6;color:#0d6662}
-    input,textarea,select{border:1px solid #cfd6de;border-radius:8px;padding:8px;width:100%;font-size:14px}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
-    .line{border-top:1px solid #e5e7eb;margin:12px 0}
-    .total{font-weight:700}
-    .right{text-align:right}
-    #msg{margin-top:10px;font-size:13px}
-  </style>
+<meta charset="utf-8">
+<title>Notas TMP Regenerative</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#00b5ad">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{--c:#00b5ad}
+  body{font-family:system-ui,sans-serif;background:#f8fafc;color:#222;margin:0}
+  h1{text-align:center;color:var(--c);margin:16px 0}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.1);padding:16px;max-width:1000px;margin:20px auto}
+  .row{display:flex;gap:8px;align-items:center}
+  .between{justify-content:space-between}
+  input,select,textarea{width:100%;padding:8px;border:1px solid #cfd6de;border-radius:8px;font-size:14px}
+  button{background:var(--c);color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer}
+  button.secondary{background:#e6f7f6;color:#0d6662}
+  button.danger{background:#e74c3c}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .grid3{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+  .line{border-top:1px solid #e5e7eb;margin:12px 0}
+  .right{text-align:right}
+  .muted{font-size:12px;color:#6b7785}
+  #msg{display:none;margin-top:8px;border-radius:8px;padding:8px}
+  .ok{background:#e7fbf9;color:#0e7a72;border:1px solid #b7efea}
+  .err{background:#fdecec;color:#8a1e1e;border:1px solid #f5bcbc}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px auto;max-width:1000px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;font-size:14px}
+  th{background:#f3f6f9}
+  @media print{ .no-print{display:none!important} .card{box-shadow:none} }
+</style>
 </head>
 <body>
   <h1>Notas de Remisión TMP Regenerative</h1>
 
-  <div class="card">
-    <h3>TMP Regenerative</h3>
-    <p>
-      Chihuahua, México<br>
-      RFC: <b>MOVG850703SL4</b> · Tel: <b>614 176 5850</b><br>
-      Email: <a href="mailto:gmorales.tmp@gmail.com" style="color:#007c89;text-decoration:none;">gmorales.tmp@gmail.com</a>
-    </p>
-    <hr>
+  <!-- Sincronización -->
+  <div class="card no-print">
+    <h3>🔄 Sincronización automática (Firebase)</h3>
+    <div class="grid2">
+      <div>
+        <label>Clave de empresa (ej. TMP-CHIH)</label>
+        <input id="companyKey" placeholder="Ej: TMP-CHIH">
+      </div>
+      <div class="row" style="align-items:end">
+        <button class="secondary" id="btnGuardarClave">Guardar clave</button>
+        <span id="syncStatus" class="muted">Estado: sin sincronizar</span>
+      </div>
+    </div>
+    <div id="msg"></div>
+    <div class="muted" style="margin-top:6px">Con clave guardada: inicio anónimo y sincronización de <b>clientes</b>, <b>productos</b> y <b>historial</b> en automático.</div>
+  </div>
 
+  <!-- Acciones -->
+  <div class="actions no-print">
+    <button id="btnGuardarNota">💾 Guardar / Nuevo folio</button>
+    <button class="secondary" id="btnVerHist">📜 Ver historial</button>
+    <button class="secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+  </div>
+
+  <!-- Encabezado empresa -->
+  <div class="card">
+    <div class="between row">
+      <div>
+        <h3 style="margin:0">TMP Regenerative</h3>
+        <p style="margin:0">Chihuahua, México</p>
+        <p style="margin:0">RFC: <b>MOVG850703SL4</b> · Tel: <b>614 176 5850</b></p>
+        <p style="margin:0">Email: <a href="mailto:gmorales.tmp@gmail.com">gmorales.tmp@gmail.com</a></p>
+      </div>
+      <div class="right">
+        <div style="font-weight:700">Nota de remisión</div>
+        <div id="folio">TMP-CHIH-0001</div>
+        <div id="fecha" class="muted"></div>
+      </div>
+    </div>
+
+    <div class="line"></div>
+
+    <!-- Cliente -->
     <h3>Cliente</h3>
     <div class="grid2">
+      <div>
+        <label>Seleccionar cliente guardado</label>
+        <select id="selCliente"></select>
+      </div>
+      <div class="row" style="align-items:end">
+        <button class="secondary" id="btnGuardarCliente">📇 Guardar cliente actual</button>
+        <button class="secondary" id="btnAdminClientes">⚙️ Ver clientes</button>
+      </div>
       <div>
         <label>Nombre</label>
         <input id="cliente" placeholder="Nombre del cliente">
@@ -46,115 +98,271 @@
       </div>
     </div>
 
-    <hr>
-    <h3>Conceptos</h3>
-    <div id="items"></div>
-    <button id="btnAddConcepto" type="button" onclick="addItem()">➕ Agregar concepto</button>
+    <!-- Admin clientes -->
+    <div id="adminClientes" class="no-print" style="display:none;margin-top:8px">
+      <div class="line"></div>
+      <h4>Clientes guardados</h4>
+      <div id="listaClientes"></div>
+    </div>
 
-    <hr>
+    <div class="line"></div>
+
+    <!-- Conceptos -->
+    <div class="between row">
+      <h3 style="margin:0">Conceptos</h3>
+      <button id="btnAddConcepto" type="button" onclick="addItem()">➕ Agregar concepto</button>
+    </div>
+
+    <div id="items"></div>
+
+    <!-- Totales -->
+    <div class="line"></div>
     <div class="grid2">
       <div>
         <label>Descuento (%)</label>
-        <input type="number" id="descuento" value="0" min="0" max="100" oninput="calc()">
+        <input type="number" id="descuento" value="0" min="0" max="100" step="0.5" oninput="calc()">
       </div>
-      <div>
-        <div class="right">
-          <p>Subtotal (IVA incluido): <b id="subtotal">$0</b></p>
-          <p>Descuento: -<span id="descMonto">$0</span></p>
-          <p class="total">Total: <b id="total">$0</b></p>
-        </div>
+      <div class="right">
+        <p>Subtotal (IVA incluido): <b id="subtotal">$0</b></p>
+        <p>Descuento: -<span id="descMonto">$0</span></p>
+        <p><b>Total: <span id="total">$0</span></b></p>
       </div>
     </div>
 
-    <hr>
-    <textarea id="notas" placeholder="Notas adicionales" rows="3" style="width:100%"></textarea>
-
-    <div style="margin-top:15px;text-align:center">
-      <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
-    </div>
-    <div id="msg"></div>
+    <div class="line"></div>
+    <textarea id="notas" rows="3" placeholder="Notas adicionales"></textarea>
   </div>
 
-  <script>
-    const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
-    const $ = (id)=>document.getElementById(id);
-    const state={nota:{items:[]}};
+  <!-- Historial -->
+  <div id="histCard" class="card no-print" style="display:none">
+    <div class="between row">
+      <h3 style="margin:0">Historial de notas</h3>
+      <input id="buscarHist" placeholder="Buscar por folio o cliente" style="max-width:260px">
+    </div>
+    <div class="line"></div>
+    <div style="overflow:auto">
+      <table>
+        <thead><tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Total</th><th>Origen</th></tr></thead>
+        <tbody id="tbodyHist"></tbody>
+      </table>
+    </div>
+  </div>
 
-    // === AGREGAR CONCEPTO ===
-    function addItem(){
-      const idx=state.nota.items.length;
-      state.nota.items.push({id:Date.now()+idx,descripcion:'',cantidad:1,precio:0});
-      const row=document.createElement('div');
-      row.className='card';
-      row.style.padding='8px';
-      row.innerHTML=`
-        <div class="grid3">
-          <div><label>Descripción</label><input id="desc-${idx}" placeholder="Descripción"></div>
-          <div><label>Cantidad</label><input type="number" id="cant-${idx}" value="1" min="1"></div>
-          <div><label>Precio</label><input type="number" id="precio-${idx}" value="0" min="0"></div>
-        </div>
-        <div class="right" style="margin-top:5px">
-          <b id="total-${idx}">$0</b>
-          <button class="secondary" onclick="removeItem(${idx})">🗑️</button>
-        </div>`;
-      $('items').appendChild(row);
+<script type="module">
+/* ===== Utilidades y estado ===== */
+const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
+const $ = id => document.getElementById(id);
+const LS = { CLIENTES:'tmp_clientes', PRODUCTOS:'tmp_productos', FOLIO:'tmp_folio', COMPANY:'tmp_company', HIST:'tmp_hist' };
+const FOLIO_PREF = "TMP-CHIH-";
+const state = { nota:{items:[]}, clientes:[], productos:[], histLocal:[], companyKey: localStorage.getItem(LS.COMPANY)||"" };
 
-      $('desc-'+idx).oninput=()=>{state.nota.items[idx].descripcion=$('desc-'+idx).value; calc();}
-      $('cant-'+idx).oninput=()=>{state.nota.items[idx].cantidad=Number($('cant-'+idx).value||0); calc();}
-      $('precio-'+idx).oninput=()=>{state.nota.items[idx].precio=Number($('precio-'+idx).value||0); calc();}
-      calc();
-    }
-    window.addItem = addItem;
+/* ===== Firebase ===== */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
-    // === BORRAR CONCEPTO ===
-    function removeItem(i){
-      state.nota.items.splice(i,1);
-      renderItems();
-      calc();
-    }
+const firebaseConfig = {
+  apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
+  authDomain: "notas-tmp.firebaseapp.com",
+  projectId: "notas-tmp",
+  storageBucket: "notas-tmp.firebasestorage.app",
+  messagingSenderId: "640595451791",
+  appId: "1:640595451791:web:dd150bca4cfb8cbc6735fa",
+  measurementId: "G-JZZPDPNE03"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-    function renderItems(){
-      $('items').innerHTML='';
-      state.nota.items.forEach((it,i)=>{
-        const row=document.createElement('div');
-        row.className='card'; row.style.padding='8px';
-        row.innerHTML=`
-          <div class="grid3">
-            <div><label>Descripción</label><input id="desc-${i}" value="${it.descripcion||''}"></div>
-            <div><label>Cantidad</label><input type="number" id="cant-${i}" value="${it.cantidad}" min="1"></div>
-            <div><label>Precio</label><input type="number" id="precio-${i}" value="${it.precio}" min="0"></div>
-          </div>
-          <div class="right" style="margin-top:5px">
-            <b id="total-${i}">${mxn.format(it.cantidad*it.precio)}</b>
-            <button class="secondary" onclick="removeItem(${i})">🗑️</button>
-          </div>`;
-        $('items').appendChild(row);
-        $('desc-'+i).oninput=()=>{state.nota.items[i].descripcion=$('desc-'+i).value; calc();}
-        $('cant-'+i).oninput=()=>{state.nota.items[i].cantidad=Number($('cant-'+i).value||0); calc();}
-        $('precio-'+i).oninput=()=>{state.nota.items[i].precio=Number($('precio-'+i).value||0); calc();}
-      });
-    }
+const colClientes = ()=>collection(db,"companies",state.companyKey,"clientes");
+const colProductos= ()=>collection(db,"companies",state.companyKey,"productos");
+const colHistorial= ()=>collection(db,"companies",state.companyKey,"historial");
+let unsubC=null,unsubP=null,unsubH=null;
 
-    // === CALCULAR ===
-    function calc(){
-      let subtotal=0;
-      state.nota.items.forEach((it,i)=>{
-        const total=it.cantidad*it.precio;
-        subtotal+=total;
-        const el=$('total-'+i); if(el) el.textContent=mxn.format(total);
-      });
-      const desc=subtotal*(Number($('descuento').value||0)/100);
-      const total=subtotal-desc;
-      $('subtotal').textContent=mxn.format(subtotal);
-      $('descMonto').textContent=mxn.format(desc);
-      $('total').textContent=mxn.format(total);
-    }
+async function ensureAuth(){
+  try{ await signInAnonymously(auth); $('syncStatus').textContent=`Estado: sincronizado (${state.companyKey})`; }
+  catch(e){ $('syncStatus').textContent="Estado: sin sincronizar"; }
+}
+function attachCloudListeners(){
+  if(!state.companyKey) return;
+  unsubC&&unsubC(); unsubP&&unsubP(); unsubH&&unsubH();
+  unsubC=onSnapshot(query(colClientes(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.clientes=arr; saveLocal(); renderClientes(); }});
+  unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); }});
+  unsubH=onSnapshot(query(colHistorial(),orderBy("ts","desc"),limit(200)),s=>{
+    const cloud=[]; s.forEach(d=>cloud.push({...d.data(), origen:"Nube"}));
+    renderHistTable(mergeHist(cloud, state.histLocal));
+  });
+}
+async function cloudUpsertCliente(c){ if(state.companyKey) try{ await setDoc(doc(colClientes(),c.nombre),c);}catch{} }
+async function cloudDeleteCliente(n){ if(state.companyKey) try{ await deleteDoc(doc(colClientes(),n));}catch{} }
+async function cloudUpsertProducto(p){ if(state.companyKey) try{ await setDoc(doc(colProductos(),p.nombre),p);}catch{} }
+async function cloudAddHist(h){ if(state.companyKey) try{ await addDoc(colHistorial(),{...h, ts:serverTimestamp()});}catch{} }
 
-    // === INICIO ===
-    window.onload=()=>{
-      if(state.nota.items.length===0) addItem();
-      calc();
-    }
-  </script>
+/* ===== Local ===== */
+function loadLocal(){
+  try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{}
+  try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{}
+  try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{}
+}
+function saveLocal(){
+  localStorage.setItem(LS.CLIENTES,JSON.stringify(state.clientes));
+  localStorage.setItem(LS.PRODUCTOS,JSON.stringify(state.productos));
+}
+function saveHistLocal(arr){ state.histLocal=arr; localStorage.setItem(LS.HIST,JSON.stringify(arr)); }
+
+/* ===== Mensajes ===== */
+function msg(txt, ok=true){ const m=$('msg'); m.style.display='block'; m.className= ok?'ok':'err'; m.textContent=txt; if(ok) setTimeout(()=>m.style.display='none',4000); }
+
+/* ===== UI Inicial ===== */
+function initUI(){
+  $('fecha').textContent=new Date().toLocaleDateString('es-MX');
+  const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
+  $('folio').textContent=FOLIO_PREF+String(folioNum).padStart(4,'0');
+
+  $('companyKey').value=state.companyKey;
+  renderClientes(); if(state.nota.items.length===0) addItem(); calc();
+
+  $('btnGuardarClave').onclick=async()=>{
+    const key=($('companyKey').value||"").trim();
+    state.companyKey=key; localStorage.setItem(LS.COMPANY,key);
+    if(!key){ $('syncStatus').textContent="Estado: sin sincronizar"; msg("Clave eliminada. Solo guardado local.",true); return; }
+    await ensureAuth(); attachCloudListeners(); msg("Sincronización automática activada ✅");
+  };
+
+  $('btnGuardarCliente').onclick=guardarCliente;
+  $('btnAdminClientes').onclick=()=>{ const p=$('adminClientes'); p.style.display=p.style.display==='none'?'block':'none'; renderClientesList(); };
+  $('selCliente').onchange=()=>{ const v=$('selCliente').value; if(v==="") return; const c=state.clientes[Number(v)]; $('cliente').value=c?.nombre||''; $('direccion').value=c?.direccion||''; };
+
+  $('btnGuardarNota').onclick=guardarNota;
+  $('btnVerHist').onclick=()=>{ const c=$('histCard'); c.style.display=c.style.display==='none'?'block':'none'; renderHistTable(mergeHist(null,state.histLocal)); };
+  $('buscarHist').oninput=()=>renderHistTable(mergeHist(null,state.histLocal));
+}
+
+/* ===== Clientes ===== */
+function renderClientes(){
+  const sel=$('selCliente');
+  sel.innerHTML='<option value="">— Elegir cliente —</option>'+state.clientes.map((c,i)=>`<option value="${i}">${c.nombre}</option>`).join('');
+}
+function renderClientesList(){
+  const cont=$('listaClientes'); cont.innerHTML='';
+  if(state.clientes.length===0){ cont.innerHTML='<div class="muted">No hay clientes guardados.</div>'; return; }
+  state.clientes.forEach((c,i)=>{
+    const row=document.createElement('div'); row.className='row'; row.style.justifyContent='space-between';
+    row.innerHTML=`<div><b>${c.nombre}</b><br><small>${c.direccion||'—'}</small></div><button class="danger">Eliminar</button>`;
+    row.querySelector('button').onclick=async()=>{ const n=state.clientes[i].nombre; state.clientes.splice(i,1); saveLocal(); renderClientes(); renderClientesList(); await cloudDeleteCliente(n); };
+    cont.appendChild(row);
+  });
+}
+async function guardarCliente(){
+  const nombre=($('cliente').value||'').trim(); const direccion=($('direccion').value||'').trim();
+  if(!nombre){ msg("Escribe el nombre del cliente",false); return; }
+  const ix=state.clientes.findIndex(c=>c.nombre.toLowerCase()===nombre.toLowerCase());
+  if(ix<0) state.clientes.unshift({nombre,direccion}); else state.clientes[ix]={nombre,direccion};
+  saveLocal(); renderClientes(); renderClientesList(); await cloudUpsertCliente({nombre,direccion}); msg("Cliente guardado ✅");
+}
+
+/* ===== Productos ===== */
+function refreshProductSelects(){
+  document.querySelectorAll('.selProducto').forEach((el,idx)=>{
+    const d=$('desc-'+idx), p=$('precio-'+idx);
+    el.innerHTML='<option value="">— Producto —</option>'+state.productos.map((pr,i)=>`<option value="${i}">${pr.nombre} (${mxn.format(pr.precio)})</option>`).join('');
+    el.onchange=()=>{ const v=el.value; if(v==="") return; const pr=state.productos[Number(v)];
+      d.value=pr.nombre; p.value=pr.precio; state.nota.items[idx].descripcion=pr.nombre; state.nota.items[idx].precio=Number(pr.precio||0); calc(); };
+  });
+}
+async function guardarProductoDesdeFila(idx){
+  const nombre=($('desc-'+idx).value||'').trim(); const precio=Number($('precio-'+idx).value||0);
+  if(!nombre){ msg("Escribe la descripción del producto",false); return; }
+  const ix=state.productos.findIndex(p=>p.nombre.toLowerCase()===nombre.toLowerCase());
+  if(ix<0) state.productos.unshift({nombre,precio}); else state.productos[ix]={nombre,precio};
+  saveLocal(); refreshProductSelects(); await cloudUpsertProducto({nombre,precio}); msg("Producto guardado ✅");
+}
+
+/* ===== Ítems y totales ===== */
+function addItem(){
+  const idx=state.nota.items.length; state.nota.items.push({descripcion:'',cantidad:1,precio:0});
+  const row=document.createElement('div'); row.className='card'; row.style.padding='10px'; row.style.margin='8px 0';
+  row.innerHTML=`
+    <div class="grid3">
+      <div><label>Descripción</label><input id="desc-${idx}" placeholder="Descripción"></div>
+      <div><label>Cantidad</label><input type="number" id="cant-${idx}" value="1" min="1"></div>
+      <div><label>Precio</label><input type="number" id="precio-${idx}" value="0" min="0"></div>
+    </div>
+    <div class="row" style="margin-top:6px;justify-content:space-between">
+      <div class="row" style="flex:1">
+        <select class="selProducto" id="sel-${idx}" style="flex:1"></select>
+        <button class="secondary" onclick="guardarProductoDesdeFila(${idx})">💾 Guardar como producto</button>
+      </div>
+      <div class="row">
+        <div class="right" style="min-width:140px"><b id="total-${idx}">$0</b></div>
+        <button class="danger" onclick="removeItem(${idx})">🗑️</button>
+      </div>
+    </div>`;
+  $('items').appendChild(row);
+  $('desc-'+idx).oninput=()=>{state.nota.items[idx].descripcion=$('desc-'+idx).value; calc();}
+  $('cant-'+idx).oninput=()=>{state.nota.items[idx].cantidad=Number($('cant-'+idx).value||0); calc();}
+  $('precio-'+idx).oninput=()=>{state.nota.items[idx].precio=Number($('precio-'+idx).value||0); calc();}
+  refreshProductSelects(); calc();
+}
+window.addItem=addItem;
+
+function removeItem(i){
+  state.nota.items.splice(i,1);
+  const backup=[...state.nota.items]; $('items').innerHTML=''; state.nota.items=[];
+  backup.forEach(()=>addItem()); backup.forEach((it,ix)=>{ $('desc-'+ix).value=it.descripcion||''; $('cant-'+ix).value=it.cantidad||1; $('precio-'+ix).value=it.precio||0; state.nota.items[ix]=it; });
+  calc();
+}
+function calc(){
+  let subtotal=0; state.nota.items.forEach((it,i)=>{ const t=Number(it.cantidad||0)*Number(it.precio||0); subtotal+=t; const el=$('total-'+i); if(el) el.textContent=mxn.format(t); });
+  const desc=subtotal*(Number($('descuento').value||0)/100); const total=Math.max(0,subtotal-desc);
+  $('subtotal').textContent=mxn.format(subtotal); $('descMonto').textContent=mxn.format(desc); $('total').textContent=mxn.format(total);
+}
+
+/* ===== Historial ===== */
+function mergeHist(cloud, local){
+  const data = (cloud||[]).concat(local?.map(h=>({...h,origen:h.origen||"Local"}))||[]);
+  return data;
+}
+function renderHistTable(data){
+  const term = ($('buscarHist')?.value||'').toLowerCase();
+  const rows = (data||state.histLocal)
+    .filter(h => !term || (h.folio||'').toLowerCase().includes(term) || (h.cliente||'').toLowerCase().includes(term))
+    .map(h=>`<tr><td>${h.fecha||'—'}</td><td>${h.folio||'—'}</td><td>${h.cliente||'—'}</td><td>${h.total||'—'}</td><td>${h.origen||'Local'}</td></tr>`)
+    .join('');
+  $('tbodyHist').innerHTML = rows || `<tr><td colspan="5" class="muted">Sin registros.</td></tr>`;
+}
+async function guardarNota(){
+  const snapshot = {
+    folio: $('folio').textContent,
+    fecha: new Date().toLocaleDateString('es-MX'),
+    cliente: $('cliente').value || '—',
+    direccion: $('direccion').value || '',
+    items: state.nota.items.map(it=>({descripcion:it.descripcion,cantidad:Number(it.cantidad||0),precio:Number(it.precio||0)})),
+    descuentoPorc: Number($('descuento').value||0),
+    notas: $('notas').value || '',
+    subtotal: $('subtotal').textContent,
+    total: $('total').textContent,
+    origen: 'Local'
+  };
+  // local
+  const hist = JSON.parse(localStorage.getItem(LS.HIST)||"[]"); hist.unshift(snapshot); saveHistLocal(hist);
+  // nube
+  await cloudAddHist(snapshot);
+
+  // nuevo folio e info
+  let folioNum=Number(localStorage.getItem(LS.FOLIO)||1); folioNum++; localStorage.setItem(LS.FOLIO,folioNum);
+  alert("Nota guardada ✅ Nuevo folio: "+FOLIO_PREF+String(folioNum).padStart(4,'0'));
+  location.reload();
+}
+
+/* ===== Bootstrap ===== */
+window.addEventListener('error', e=>msg(e.message||'Error',false));
+window.addEventListener('unhandledrejection', e=>msg((e.reason&&e.reason.message)||'Error',false));
+
+loadLocal();               // catálogos + historial local
+initUI();                  // UI y handlers
+renderHistTable(state.histLocal);
+if(state.companyKey){ ensureAuth().then(attachCloudListeners); }
+</script>
 </body>
 </html>
