@@ -30,8 +30,6 @@
   th,td{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;font-size:14px}
   th{background:#f3f6f9}
   .paybox{border:1px dashed #9adeda;background:#f6fffe;border-radius:10px;padding:10px}
-  .qrwrap{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .qrhint{font-size:12px;color:#0e7a72}
   @media print{ .no-print{display:none!important} .card{box-shadow:none} }
 </style>
 </head>
@@ -150,10 +148,8 @@
     <div class="line"></div>
     <div class="paybox" id="bankPrint">
       <b>Datos para pago</b>
-      <div id="bankRender" class="muted" style="margin-top:6px"></div>
-      <div class="qrwrap" style="margin-top:8px">
-        <div id="qrContainer" title="QR SPEI"></div>
-        <div class="qrhint">Escanea para ver los datos SPEI en tu celular.<br>Incluye Beneficiario, Banco, CLABE, Referencia, Cliente y Total.</div>
+      <div id="bankRender" class="muted" style="margin-top:6px">
+        <!-- Se llena por JS -->
       </div>
     </div>
   </div>
@@ -208,10 +204,9 @@
     </div>
   </div>
 
-<!-- Librerías PDF y QR -->
+<!-- Librerías PDF -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script type="module">
 /* ===== Utilidades y estado ===== */
@@ -228,8 +223,7 @@ const state = {
   companyKey: localStorage.getItem(LS.COMPANY)||"",
   editProdIndex: null,
   editProdDraft: null,
-  bank: { banco:"", beneficiario:"", clabe:"", cuenta:"", referencia:"" },
-  qr: null
+  bank: { banco:"", beneficiario:"", clabe:"", cuenta:"", referencia:"" }
 };
 
 /* ===== Firebase ===== */
@@ -260,19 +254,29 @@ const docBank     = ()=>doc(db,"companies",state.companyKey,"config","bank");
 
 let unsubC=null,unsubP=null,unsubH=null,unsubB=null;
 
-async function ensureAuth(){ try{ await signInAnonymously(auth); $('syncStatus').textContent=`Estado: sincronizado (${state.companyKey})`; } catch(e){ $('syncStatus').textContent="Estado: sin sincronizar"; } }
+async function ensureAuth(){
+  try{ await signInAnonymously(auth); $('syncStatus').textContent=`Estado: sincronizado (${state.companyKey})`; }
+  catch(e){ $('syncStatus').textContent="Estado: sin sincronizar"; }
+}
 function attachCloudListeners(){
   if(!state.companyKey) return;
   unsubC&&unsubC(); unsubP&&unsubP(); unsubH&&unsubH(); unsubB&&unsubB();
   unsubC=onSnapshot(query(colClientes(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.clientes=arr; saveLocal(); renderClientes(); }});
-  unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); renderProductosList(); }});
+  unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{
+    const arr=[]; s.forEach(d=>arr.push(d.data()));
+    if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); renderProductosList(); }
+  });
   unsubH=onSnapshot(query(colHistorial(),orderBy("ts","desc"),limit(200)),s=>{
     const cloud=[]; s.forEach(d=>cloud.push({...d.data(), _id:d.id, origen:"Nube"}));
-    state.histMerged = mergeHist(cloud, state.histLocal); renderHistTable(state.histMerged);
+    state.histMerged = mergeHist(cloud, state.histLocal);
+    renderHistTable(state.histMerged);
   });
   unsubB=onSnapshot(docBank(), snap=>{
     if(snap.exists()){
-      state.bank = snap.data(); saveBankLocal(); fillBankForm(); renderBankInPrint(); renderBankQRCode();
+      state.bank = snap.data();
+      saveBankLocal();
+      fillBankForm();
+      renderBankInPrint();
       $('bankStatus').textContent = 'Sincronizado';
     }
   });
@@ -282,7 +286,11 @@ async function cloudDeleteCliente(n){ if(state.companyKey) try{ await deleteDoc(
 async function cloudUpsertProducto(p){ if(state.companyKey) try{ await setDoc(doc(colProductos(),p.nombre),p);}catch{} }
 async function cloudDeleteProducto(n){ if(state.companyKey) try{ await deleteDoc(doc(colProductos(),n));}catch{} }
 async function cloudAddHist(h){ if(state.companyKey) try{ await addDoc(colHistorial(),{...h, ts:serverTimestamp()});}catch{} }
-async function cloudSaveBank(){ if(!state.companyKey) return; try{ await setDoc(docBank(), state.bank); $('bankStatus').textContent='Guardado en nube ✅'; } catch(e){ $('bankStatus').textContent='Error al guardar en nube'; } }
+async function cloudSaveBank(){
+  if(!state.companyKey) return;
+  try{ await setDoc(docBank(), state.bank); $('bankStatus').textContent='Guardado en nube ✅'; }
+  catch(e){ $('bankStatus').textContent='Error al guardar en nube'; }
+}
 
 /* ===== Local ===== */
 function loadLocal(){
@@ -292,7 +300,10 @@ function loadLocal(){
   try{state.bank=JSON.parse(localStorage.getItem(LS.BANK)||"{}")}catch{}
   state.bank = Object.assign({banco:"",beneficiario:"",clabe:"",cuenta:"",referencia:""}, state.bank||{});
 }
-function saveLocal(){ localStorage.setItem(LS.CLIENTES,JSON.stringify(state.clientes)); localStorage.setItem(LS.PRODUCTOS,JSON.stringify(state.productos)); }
+function saveLocal(){
+  localStorage.setItem(LS.CLIENTES,JSON.stringify(state.clientes));
+  localStorage.setItem(LS.PRODUCTOS,JSON.stringify(state.productos));
+}
 function saveHistLocal(arr){ state.histLocal=arr; localStorage.setItem(LS.HIST,JSON.stringify(arr)); }
 function saveBankLocal(){ localStorage.setItem(LS.BANK, JSON.stringify(state.bank)); }
 
@@ -311,7 +322,8 @@ function initUI(){
   if(state.nota.items.length===0) addItem(); calc();
 
   // Bank form inicial
-  fillBankForm(); renderBankInPrint(); renderBankQRCode();
+  fillBankForm();
+  renderBankInPrint();
 
   $('btnGuardarClave').onclick=async()=>{
     const key=($('companyKey').value||"").trim();
@@ -324,9 +336,7 @@ function initUI(){
 
   $('btnGuardarCliente').onclick=guardarCliente;
   $('btnAdminClientes').onclick=()=>{ const p=$('adminClientes'); p.style.display=p.style.display==='none'?'block':'none'; renderClientesList(); };
-  $('selCliente').onchange=()=>{ const v=$('selCliente').value; if(v==="") return; const c=state.clientes[Number(v)]; $('cliente').value=c?.nombre||''; $('direccion').value=c?.direccion||''; renderBankQRCode(); };
-
-  $('cliente').oninput=()=>renderBankQRCode();
+  $('selCliente').onchange=()=>{ const v=$('selCliente').value; if(v==="") return; const c=state.clientes[Number(v)]; $('cliente').value=c?.nombre||''; $('direccion').value=c?.direccion||''; };
 
   $('btnGuardarNota').onclick=guardarNota;
   $('btnVerHist').onclick=()=>{ const c=$('histCard'); c.style.display=c.style.display==='none'?'block':'none'; renderHistTable(state.histMerged.length?state.histMerged:mergeHist(null,state.histLocal)); };
@@ -479,7 +489,6 @@ function calc(){
   let subtotal=0; state.nota.items.forEach((it,i)=>{ const t=Number(it.cantidad||0)*Number(it.precio||0); subtotal+=t; const el=$('total-'+i); if(el) el.textContent=mxn.format(t); });
   const desc=subtotal*(Number($('descuento').value||0)/100); const total=Math.max(0,subtotal-desc);
   $('subtotal').textContent=mxn.format(subtotal); $('descMonto').textContent=mxn.format(desc); $('total').textContent=mxn.format(total);
-  renderBankQRCode(); // actualizar QR con el nuevo total
 }
 
 /* ===== Historial ===== */
@@ -551,12 +560,20 @@ async function guardarNota(){
 }
 
 /* Borrar historial */
-function clearHistLocal(){ if(!confirm("¿Borrar TODO el historial local? Esta acción no se puede deshacer.")) return; saveHistLocal([]); renderHistTable([]); msg("Historial local borrado ✅"); }
+function clearHistLocal(){
+  if(!confirm("¿Borrar TODO el historial local? Esta acción no se puede deshacer.")) return;
+  saveHistLocal([]); renderHistTable([]); msg("Historial local borrado ✅");
+}
 async function clearHistCloud(){
   if(!state.companyKey){ alert("Primero guarda una clave de empresa para usar la nube."); return; }
   if(!confirm("¿Borrar TODO el historial en la nube para esta clave?")) return;
-  try{ const snaps = await getDocs(colHistorial()); const ops = []; snaps.forEach(d=>ops.push(deleteDoc(d.ref))); await Promise.all(ops); msg("Historial en la nube borrado ✅"); }
-  catch(e){ msg("No se pudo borrar el historial en la nube", false); }
+  try{
+    const snaps = await getDocs(colHistorial());
+    const ops = [];
+    snaps.forEach(d=>ops.push(deleteDoc(d.ref)));
+    await Promise.all(ops);
+    msg("Historial en la nube borrado ✅");
+  }catch(e){ msg("No se pudo borrar el historial en la nube", false); }
 }
 
 /* ===== Datos bancarios ===== */
@@ -586,44 +603,10 @@ async function saveBankFromForm(){
     cuenta: $('bankCuenta').value.trim(),
     referencia: $('bankRef').value.trim()
   };
-  saveBankLocal(); renderBankInPrint(); renderBankQRCode();
+  saveBankLocal();
+  renderBankInPrint();
   $('bankStatus').textContent = 'Guardado local ✅';
   await cloudSaveBank();
-}
-
-/* ===== QR SPEI ===== */
-function makeSpeiText(){
-  // Formato de texto claro para apps/lectores: campos clave en líneas separadas
-  const b = state.bank;
-  const cliente = ($('cliente')?.value||'').trim();
-  const total = ($('total')?.textContent||'').trim();
-  const folio = ($('folio')?.textContent||'').trim();
-  const payload =
-`SPEI
-Beneficiario: ${b.beneficiario||''}
-Banco: ${b.banco||''}
-CLABE: ${b.clabe||''}
-Cuenta: ${b.cuenta||''}
-Referencia: ${b.referencia||folio}
-Cliente: ${cliente}
-Total: ${total}`;
-  return payload;
-}
-function renderBankQRCode(){
-  const cont = document.getElementById('qrContainer');
-  if(!cont) return;
-  cont.innerHTML = ""; // limpiar
-  const hasCore = (state.bank?.beneficiario||'').trim() && (state.bank?.clabe||'').trim();
-  if(!hasCore){ cont.innerHTML = '<span class="muted">Agrega al menos Beneficiario y CLABE para mostrar el QR.</span>'; return; }
-  // Generar QR de 160px
-  // (Nota: es un QR de texto con datos SPEI; no es CoDi oficial)
-  const qr = new window.QRCode(cont, {
-    text: makeSpeiText(),
-    width: 160,
-    height: 160,
-    correctLevel: window.QRCode.CorrectLevel.M
-  });
-  state.qr = qr;
 }
 
 /* ===== Exportar PDF ===== */
