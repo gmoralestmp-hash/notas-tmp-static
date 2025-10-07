@@ -59,7 +59,7 @@
     <button class="secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
-  <!-- Encabezado -->
+  <!-- Encabezado empresa -->
   <div class="card">
     <div class="between row">
       <div>
@@ -110,10 +110,20 @@
     <!-- Conceptos -->
     <div class="between row">
       <h3 style="margin:0">Conceptos</h3>
-      <button id="btnAddConcepto" type="button" onclick="addItem()">➕ Agregar concepto</button>
+      <div class="row">
+        <button class="secondary" id="btnAdminProductos">⚙️ Ver productos</button>
+        <button id="btnAddConcepto" type="button" onclick="addItem()">➕ Agregar concepto</button>
+      </div>
     </div>
 
     <div id="items"></div>
+
+    <!-- Admin productos -->
+    <div id="adminProductos" class="no-print" style="display:none;margin-top:8px">
+      <div class="line"></div>
+      <h4>Productos guardados</h4>
+      <div id="listaProductos"></div>
+    </div>
 
     <!-- Totales -->
     <div class="line"></div>
@@ -137,7 +147,11 @@
   <div id="histCard" class="card no-print" style="display:none">
     <div class="between row">
       <h3 style="margin:0">Historial de notas</h3>
-      <input id="buscarHist" placeholder="Buscar por folio o cliente" style="max-width:260px">
+      <div class="row">
+        <input id="buscarHist" placeholder="Buscar por folio o cliente" style="max-width:260px">
+        <button class="danger" id="btnClearHistLocal">🗑️ Borrar historial (local)</button>
+        <button class="danger" id="btnClearHistCloud">🗑️ Borrar historial (nube)</button>
+      </div>
     </div>
     <div class="line"></div>
     <div style="overflow:auto">
@@ -153,12 +167,22 @@
 const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
 const $ = id => document.getElementById(id);
 const LS = { CLIENTES:'tmp_clientes', PRODUCTOS:'tmp_productos', FOLIO:'tmp_folio', COMPANY:'tmp_company', HIST:'tmp_hist' };
-const state = { nota:{items:[]}, clientes:[], productos:[], histLocal:[], histMerged:[], companyKey: localStorage.getItem(LS.COMPANY)||"" };
+const state = {
+  nota:{items:[]},
+  clientes:[], productos:[],
+  histLocal:[], histMerged:[],
+  companyKey: localStorage.getItem(LS.COMPANY)||"",
+  editProdIndex: null,   // <-- índice en edición
+  editProdDraft: null    // <-- {nombre, precio, oldName}
+};
 
 /* ===== Firebase ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, addDoc, getDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, addDoc, getDoc, getDocs,
+  onSnapshot, query, orderBy, limit, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
@@ -186,7 +210,10 @@ function attachCloudListeners(){
   if(!state.companyKey) return;
   unsubC&&unsubC(); unsubP&&unsubP(); unsubH&&unsubH();
   unsubC=onSnapshot(query(colClientes(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.clientes=arr; saveLocal(); renderClientes(); }});
-  unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); }});
+  unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{
+    const arr=[]; s.forEach(d=>arr.push(d.data()));
+    if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); renderProductosList(); }
+  });
   unsubH=onSnapshot(query(colHistorial(),orderBy("ts","desc"),limit(200)),s=>{
     const cloud=[]; s.forEach(d=>cloud.push({...d.data(), _id:d.id, origen:"Nube"}));
     state.histMerged = mergeHist(cloud, state.histLocal);
@@ -196,6 +223,7 @@ function attachCloudListeners(){
 async function cloudUpsertCliente(c){ if(state.companyKey) try{ await setDoc(doc(colClientes(),c.nombre),c);}catch{} }
 async function cloudDeleteCliente(n){ if(state.companyKey) try{ await deleteDoc(doc(colClientes(),n));}catch{} }
 async function cloudUpsertProducto(p){ if(state.companyKey) try{ await setDoc(doc(colProductos(),p.nombre),p);}catch{} }
+async function cloudDeleteProducto(n){ if(state.companyKey) try{ await deleteDoc(doc(colProductos(),n));}catch{} }
 async function cloudAddHist(h){ if(state.companyKey) try{ await addDoc(colHistorial(),{...h, ts:serverTimestamp()});}catch{} }
 
 /* ===== Local ===== */
@@ -221,15 +249,14 @@ function initUI(){
   $('folio').textContent=currentFolioPrefix()+String(folioNum).padStart(4,'0');
 
   $('companyKey').value=state.companyKey;
-  renderClientes(); if(state.nota.items.length===0) addItem(); calc();
+  renderClientes(); renderProductosList();
+  if(state.nota.items.length===0) addItem(); calc();
 
   $('btnGuardarClave').onclick=async()=>{
     const key=($('companyKey').value||"").trim();
     state.companyKey=key; localStorage.setItem(LS.COMPANY,key);
-    // refrescar folio mostrado con la nueva clave
     const num=Number(localStorage.getItem(LS.FOLIO)||1);
     $('folio').textContent=currentFolioPrefix()+String(num).padStart(4,'0');
-
     if(!key){ $('syncStatus').textContent="Estado: sin sincronizar"; msg("Clave eliminada. Solo guardado local.",true); return; }
     await ensureAuth(); attachCloudListeners(); msg("Sincronización automática activada ✅");
   };
@@ -241,6 +268,11 @@ function initUI(){
   $('btnGuardarNota').onclick=guardarNota;
   $('btnVerHist').onclick=()=>{ const c=$('histCard'); c.style.display=c.style.display==='none'?'block':'none'; renderHistTable(state.histMerged.length?state.histMerged:mergeHist(null,state.histLocal)); };
   $('buscarHist').oninput=()=>renderHistTable(state.histMerged.length?state.histMerged:mergeHist(null,state.histLocal));
+
+  $('btnAdminProductos').onclick=()=>{ const p=$('adminProductos'); p.style.display=p.style.display==='none'?'block':'none'; renderProductosList(); };
+
+  $('btnClearHistLocal').onclick=clearHistLocal;
+  $('btnClearHistCloud').onclick=clearHistCloud;
 }
 
 /* ===== Clientes ===== */
@@ -275,14 +307,82 @@ function refreshProductSelects(){
       d.value=pr.nombre; p.value=pr.precio; state.nota.items[idx].descripcion=pr.nombre; state.nota.items[idx].precio=Number(pr.precio||0); calc(); };
   });
 }
+
+function renderProductosList(){
+  const cont=$('listaProductos'); if(!cont) return; cont.innerHTML='';
+  if(state.productos.length===0){ cont.innerHTML='<div class="muted">No hay productos guardados.</div>'; return; }
+  state.productos.forEach((p,i)=>{
+    const isEdit = state.editProdIndex===i;
+    const row=document.createElement('div'); row.className='row'; row.style.justifyContent='space-between'; row.style.flexWrap='wrap';
+
+    if(isEdit){
+      const draft = state.editProdDraft || {nombre:p.nombre, precio:p.precio, oldName:p.nombre};
+      row.innerHTML = `
+        <div class="row" style="gap:8px;flex:1">
+          <input id="editNombre" value="${draft.nombre}" placeholder="Nombre" style="min-width:220px">
+          <input id="editPrecio" type="number" value="${draft.precio}" min="0" step="0.01" style="width:140px">
+        </div>
+        <div class="row">
+          <button id="btnSaveEdit">Guardar</button>
+          <button class="secondary" id="btnCancelEdit">Cancelar</button>
+        </div>`;
+      row.querySelector('#editNombre').oninput = (e)=>{ state.editProdDraft = {...draft, nombre:e.target.value}; };
+      row.querySelector('#editPrecio').oninput = (e)=>{ state.editProdDraft = {...(state.editProdDraft||draft), precio:Number(e.target.value||0)}; };
+      row.querySelector('#btnSaveEdit').onclick = ()=>saveEditProducto(i);
+      row.querySelector('#btnCancelEdit').onclick = ()=>{ state.editProdIndex=null; state.editProdDraft=null; renderProductosList(); };
+    } else {
+      row.innerHTML=`<div><b>${p.nombre}</b> — ${mxn.format(p.precio)}</div>
+                     <div class="row">
+                       <button class="secondary">Editar</button>
+                       <button class="danger">Eliminar</button>
+                     </div>`;
+      row.querySelector('.secondary').onclick=()=>{
+        state.editProdIndex=i;
+        state.editProdDraft={nombre:p.nombre, precio:p.precio, oldName:p.nombre};
+        renderProductosList();
+      };
+      row.querySelector('.danger').onclick=async()=>{
+        if(!confirm(`Eliminar producto "${p.nombre}"?`)) return;
+        const nombre = p.nombre;
+        state.productos.splice(i,1); saveLocal(); refreshProductSelects(); renderProductosList();
+        await cloudDeleteProducto(nombre);
+      };
+    }
+    cont.appendChild(row);
+  });
+}
+
+async function saveEditProducto(i){
+  const draft = state.editProdDraft;
+  if(!draft || !draft.nombre?.trim()){ msg("Escribe el nombre del producto", false); return; }
+  const newName = draft.nombre.trim();
+  const newPrice = Number(draft.precio||0);
+  const oldName = draft.oldName;
+
+  // validar duplicado (excepto si es el mismo índice)
+  const dupIx = state.productos.findIndex((pp,ix)=>pp.nombre.toLowerCase()===newName.toLowerCase() && ix!==i);
+  if(dupIx>=0){ msg("Ya existe un producto con ese nombre", false); return; }
+
+  // actualizar local
+  state.productos[i] = {nombre:newName, precio:newPrice};
+  saveLocal(); refreshProductSelects(); renderProductosList();
+
+  // cloud: crear/actualizar y borrar el antiguo si cambió el nombre
+  await cloudUpsertProducto({nombre:newName, precio:newPrice});
+  if(oldName && oldName !== newName){ await cloudDeleteProducto(oldName); }
+
+  state.editProdIndex=null; state.editProdDraft=null;
+  msg("Producto actualizado ✅");
+}
+
 async function guardarProductoDesdeFila(idx){
   const nombre=($('desc-'+idx).value||'').trim(); const precio=Number($('precio-'+idx).value||0);
   if(!nombre){ msg("Escribe la descripción del producto",false); return; }
   const ix=state.productos.findIndex(p=>p.nombre.toLowerCase()===nombre.toLowerCase());
   if(ix<0) state.productos.unshift({nombre,precio}); else state.productos[ix]={nombre,precio};
-  saveLocal(); refreshProductSelects(); await cloudUpsertProducto({nombre,precio}); msg("Producto guardado ✅");
+  saveLocal(); refreshProductSelects(); renderProductosList(); await cloudUpsertProducto({nombre,precio}); msg("Producto guardado ✅");
 }
-window.guardarProductoDesdeFila = guardarProductoDesdeFila; // <<<<<< EXPUESTO PARA EVITAR EL ERROR
+window.guardarProductoDesdeFila = guardarProductoDesdeFila;
 
 /* ===== Ítems y totales ===== */
 function addItem(){
@@ -328,7 +428,7 @@ function calc(){
 function mergeHist(cloud, local){
   const L = (local||[]).map((h,i)=>({...h,_localIndex:i,origen:h.origen||"Local"}));
   const C = (cloud||[]);
-  return [...C, ...L]; // nube primero
+  return [...C, ...L];
 }
 function renderHistTable(data){
   const term = ($('buscarHist')?.value||'').toLowerCase();
@@ -368,13 +468,8 @@ function cargarNotaEnFormulario(h){
   alert("Nota cargada en el formulario ✅ Edítala y guarda para generar un nuevo folio.");
   window.scrollTo({top:0,behavior:'smooth'});
 }
-window.usarNotaLocal = (i)=>{
-  if(i<0) return; const h = state.histLocal[i]; if(!h) return; cargarNotaEnFormulario(h);
-};
-window.usarNotaNube = async (id)=>{
-  try{ const snap = await getDoc(doc(colHistorial(), id)); if(!snap.exists()) return; const h = snap.data(); cargarNotaEnFormulario(h); }
-  catch(e){ alert("No se pudo cargar la nota de la nube"); }
-};
+window.usarNotaLocal = (i)=>{ if(i<0) return; const h = state.histLocal[i]; if(!h) return; cargarNotaEnFormulario(h); };
+window.usarNotaNube = async (id)=>{ try{ const snap = await getDoc(doc(colHistorial(), id)); if(!snap.exists()) return; cargarNotaEnFormulario(snap.data()); } catch(e){ alert("No se pudo cargar la nota de la nube"); } };
 
 async function guardarNota(){
   const snapshot = {
@@ -397,22 +492,36 @@ async function guardarNota(){
   location.reload();
 }
 
+/* Borrar historial */
+function clearHistLocal(){
+  if(!confirm("¿Borrar TODO el historial local? Esta acción no se puede deshacer.")) return;
+  saveHistLocal([]); renderHistTable([]); msg("Historial local borrado ✅");
+}
+async function clearHistCloud(){
+  if(!state.companyKey){ alert("Primero guarda una clave de empresa para usar la nube."); return; }
+  if(!confirm("¿Borrar TODO el historial en la nube para esta clave?")) return;
+  try{
+    const snaps = await getDocs(colHistorial());
+    const ops = [];
+    snaps.forEach(d=>ops.push(deleteDoc(d.ref)));
+    await Promise.all(ops);
+    msg("Historial en la nube borrado ✅");
+  }catch(e){ msg("No se pudo borrar el historial en la nube", false); }
+}
+
 /* ===== Bootstrap ===== */
 window.addEventListener('error', e=>msg(e.message||'Error',false));
 window.addEventListener('unhandledrejection', e=>msg((e.reason&&e.reason.message)||'Error',false));
 
 (function start(){
   try{
-    // Local
     try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{}
     try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{}
     try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{}
 
-    // UI
     initUI();
     renderHistTable(state.histLocal);
 
-    // Sync si hay clave
     if(state.companyKey){ ensureAuth().then(attachCloudListeners); }
   }catch(e){ console.error(e); msg("Error al iniciar: "+e.message,false); }
 })();
