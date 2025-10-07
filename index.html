@@ -29,6 +29,7 @@
   table{width:100%;border-collapse:collapse}
   th,td{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;font-size:14px}
   th{background:#f3f6f9}
+  .paybox{border:1px dashed #9adeda;background:#f6fffe;border-radius:10px;padding:10px}
   @media print{ .no-print{display:none!important} .card{box-shadow:none} }
 </style>
 </head>
@@ -49,7 +50,7 @@
       </div>
     </div>
     <div id="msg"></div>
-    <div class="muted" style="margin-top:6px">Con clave guardada: sincroniza <b>clientes</b>, <b>productos</b> y <b>historial</b> en automático.</div>
+    <div class="muted" style="margin-top:6px">Con clave guardada: sincroniza <b>clientes</b>, <b>productos</b>, <b>historial</b> y <b>datos bancarios</b> en automático.</div>
   </div>
 
   <!-- Acciones -->
@@ -57,10 +58,11 @@
     <button id="btnGuardarNota">💾 Guardar / Nuevo folio</button>
     <button class="secondary" id="btnVerHist">📜 Ver historial</button>
     <button class="secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="secondary" id="btnExportPDF">⬇️ Exportar PDF</button>
   </div>
 
-  <!-- Encabezado empresa -->
-  <div class="card">
+  <!-- Encabezado + nota (área imprimible) -->
+  <div id="printArea" class="card">
     <div class="between row">
       <div>
         <h3 style="margin:0">Gilberto Morales Vargas</h3>
@@ -84,7 +86,7 @@
         <label>Seleccionar cliente guardado</label>
         <select id="selCliente"></select>
       </div>
-      <div class="row" style="align-items:end">
+      <div class="row no-print" style="align-items:end">
         <button class="secondary" id="btnGuardarCliente">📇 Guardar cliente actual</button>
         <button class="secondary" id="btnAdminClientes">⚙️ Ver clientes</button>
       </div>
@@ -110,7 +112,7 @@
     <!-- Conceptos -->
     <div class="between row">
       <h3 style="margin:0">Conceptos</h3>
-      <div class="row">
+      <div class="row no-print">
         <button class="secondary" id="btnAdminProductos">⚙️ Ver productos</button>
         <button id="btnAddConcepto" type="button" onclick="addItem()">➕ Agregar concepto</button>
       </div>
@@ -141,6 +143,46 @@
 
     <div class="line"></div>
     <textarea id="notas" rows="3" placeholder="Notas adicionales"></textarea>
+
+    <!-- DATOS PARA PAGO (se imprime) -->
+    <div class="line"></div>
+    <div class="paybox" id="bankPrint">
+      <b>Datos para pago</b>
+      <div id="bankRender" class="muted" style="margin-top:6px">
+        <!-- Se llena por JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Configurar datos bancarios (NO se imprime) -->
+  <div class="card no-print">
+    <h3>🏦 Datos bancarios (se imprimen en la nota)</h3>
+    <div class="grid2">
+      <div>
+        <label>Banco</label>
+        <input id="bankBanco" placeholder="Ej. BBVA, Santander, Banorte">
+      </div>
+      <div>
+        <label>Beneficiario</label>
+        <input id="bankBenef" placeholder="Nombre del beneficiario">
+      </div>
+      <div>
+        <label>CLABE</label>
+        <input id="bankClabe" placeholder="18 dígitos">
+      </div>
+      <div>
+        <label>Cuenta</label>
+        <input id="bankCuenta" placeholder="Número de cuenta">
+      </div>
+      <div>
+        <label>Referencia</label>
+        <input id="bankRef" placeholder="Texto de referencia">
+      </div>
+      <div class="row" style="align-items:end">
+        <button id="btnSaveBank" class="secondary">Guardar datos bancarios</button>
+        <span id="bankStatus" class="muted">Sin guardar</span>
+      </div>
+    </div>
   </div>
 
   <!-- Historial -->
@@ -162,18 +204,26 @@
     </div>
   </div>
 
+<!-- Librerías PDF -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
 <script type="module">
 /* ===== Utilidades y estado ===== */
 const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
 const $ = id => document.getElementById(id);
-const LS = { CLIENTES:'tmp_clientes', PRODUCTOS:'tmp_productos', FOLIO:'tmp_folio', COMPANY:'tmp_company', HIST:'tmp_hist' };
+const LS = {
+  CLIENTES:'tmp_clientes', PRODUCTOS:'tmp_productos', FOLIO:'tmp_folio',
+  COMPANY:'tmp_company', HIST:'tmp_hist', BANK:'tmp_bank'
+};
 const state = {
   nota:{items:[]},
   clientes:[], productos:[],
   histLocal:[], histMerged:[],
   companyKey: localStorage.getItem(LS.COMPANY)||"",
-  editProdIndex: null,   // <-- índice en edición
-  editProdDraft: null    // <-- {nombre, precio, oldName}
+  editProdIndex: null,
+  editProdDraft: null,
+  bank: { banco:"", beneficiario:"", clabe:"", cuenta:"", referencia:"" }
 };
 
 /* ===== Firebase ===== */
@@ -200,7 +250,9 @@ const db = getFirestore(app);
 const colClientes = ()=>collection(db,"companies",state.companyKey,"clientes");
 const colProductos= ()=>collection(db,"companies",state.companyKey,"productos");
 const colHistorial= ()=>collection(db,"companies",state.companyKey,"historial");
-let unsubC=null,unsubP=null,unsubH=null;
+const docBank     = ()=>doc(db,"companies",state.companyKey,"config","bank");
+
+let unsubC=null,unsubP=null,unsubH=null,unsubB=null;
 
 async function ensureAuth(){
   try{ await signInAnonymously(auth); $('syncStatus').textContent=`Estado: sincronizado (${state.companyKey})`; }
@@ -208,7 +260,7 @@ async function ensureAuth(){
 }
 function attachCloudListeners(){
   if(!state.companyKey) return;
-  unsubC&&unsubC(); unsubP&&unsubP(); unsubH&&unsubH();
+  unsubC&&unsubC(); unsubP&&unsubP(); unsubH&&unsubH(); unsubB&&unsubB();
   unsubC=onSnapshot(query(colClientes(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.clientes=arr; saveLocal(); renderClientes(); }});
   unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{
     const arr=[]; s.forEach(d=>arr.push(d.data()));
@@ -219,24 +271,41 @@ function attachCloudListeners(){
     state.histMerged = mergeHist(cloud, state.histLocal);
     renderHistTable(state.histMerged);
   });
+  unsubB=onSnapshot(docBank(), snap=>{
+    if(snap.exists()){
+      state.bank = snap.data();
+      saveBankLocal();
+      fillBankForm();
+      renderBankInPrint();
+      $('bankStatus').textContent = 'Sincronizado';
+    }
+  });
 }
 async function cloudUpsertCliente(c){ if(state.companyKey) try{ await setDoc(doc(colClientes(),c.nombre),c);}catch{} }
 async function cloudDeleteCliente(n){ if(state.companyKey) try{ await deleteDoc(doc(colClientes(),n));}catch{} }
 async function cloudUpsertProducto(p){ if(state.companyKey) try{ await setDoc(doc(colProductos(),p.nombre),p);}catch{} }
 async function cloudDeleteProducto(n){ if(state.companyKey) try{ await deleteDoc(doc(colProductos(),n));}catch{} }
 async function cloudAddHist(h){ if(state.companyKey) try{ await addDoc(colHistorial(),{...h, ts:serverTimestamp()});}catch{} }
+async function cloudSaveBank(){
+  if(!state.companyKey) return;
+  try{ await setDoc(docBank(), state.bank); $('bankStatus').textContent='Guardado en nube ✅'; }
+  catch(e){ $('bankStatus').textContent='Error al guardar en nube'; }
+}
 
 /* ===== Local ===== */
 function loadLocal(){
   try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{}
   try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{}
   try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{}
+  try{state.bank=JSON.parse(localStorage.getItem(LS.BANK)||"{}")}catch{}
+  state.bank = Object.assign({banco:"",beneficiario:"",clabe:"",cuenta:"",referencia:""}, state.bank||{});
 }
 function saveLocal(){
   localStorage.setItem(LS.CLIENTES,JSON.stringify(state.clientes));
   localStorage.setItem(LS.PRODUCTOS,JSON.stringify(state.productos));
 }
 function saveHistLocal(arr){ state.histLocal=arr; localStorage.setItem(LS.HIST,JSON.stringify(arr)); }
+function saveBankLocal(){ localStorage.setItem(LS.BANK, JSON.stringify(state.bank)); }
 
 /* ===== Mensajes ===== */
 function msg(txt, ok=true){ const m=$('msg'); m.style.display='block'; m.className= ok?'ok':'err'; m.textContent=txt; if(ok) setTimeout(()=>m.style.display='none',4000); }
@@ -251,6 +320,10 @@ function initUI(){
   $('companyKey').value=state.companyKey;
   renderClientes(); renderProductosList();
   if(state.nota.items.length===0) addItem(); calc();
+
+  // Bank form inicial
+  fillBankForm();
+  renderBankInPrint();
 
   $('btnGuardarClave').onclick=async()=>{
     const key=($('companyKey').value||"").trim();
@@ -273,6 +346,11 @@ function initUI(){
 
   $('btnClearHistLocal').onclick=clearHistLocal;
   $('btnClearHistCloud').onclick=clearHistCloud;
+
+  $('btnExportPDF').onclick=exportPDF;
+
+  // Guardar banco
+  $('btnSaveBank').onclick=saveBankFromForm;
 }
 
 /* ===== Clientes ===== */
@@ -307,7 +385,6 @@ function refreshProductSelects(){
       d.value=pr.nombre; p.value=pr.precio; state.nota.items[idx].descripcion=pr.nombre; state.nota.items[idx].precio=Number(pr.precio||0); calc(); };
   });
 }
-
 function renderProductosList(){
   const cont=$('listaProductos'); if(!cont) return; cont.innerHTML='';
   if(state.productos.length===0){ cont.innerHTML='<div class="muted">No hay productos guardados.</div>'; return; }
@@ -351,30 +428,20 @@ function renderProductosList(){
     cont.appendChild(row);
   });
 }
-
 async function saveEditProducto(i){
   const draft = state.editProdDraft;
   if(!draft || !draft.nombre?.trim()){ msg("Escribe el nombre del producto", false); return; }
   const newName = draft.nombre.trim();
   const newPrice = Number(draft.precio||0);
   const oldName = draft.oldName;
-
-  // validar duplicado (excepto si es el mismo índice)
   const dupIx = state.productos.findIndex((pp,ix)=>pp.nombre.toLowerCase()===newName.toLowerCase() && ix!==i);
   if(dupIx>=0){ msg("Ya existe un producto con ese nombre", false); return; }
-
-  // actualizar local
   state.productos[i] = {nombre:newName, precio:newPrice};
   saveLocal(); refreshProductSelects(); renderProductosList();
-
-  // cloud: crear/actualizar y borrar el antiguo si cambió el nombre
   await cloudUpsertProducto({nombre:newName, precio:newPrice});
   if(oldName && oldName !== newName){ await cloudDeleteProducto(oldName); }
-
-  state.editProdIndex=null; state.editProdDraft=null;
-  msg("Producto actualizado ✅");
+  state.editProdIndex=null; state.editProdDraft=null; msg("Producto actualizado ✅");
 }
-
 async function guardarProductoDesdeFila(idx){
   const nombre=($('desc-'+idx).value||'').trim(); const precio=Number($('precio-'+idx).value||0);
   if(!nombre){ msg("Escribe la descripción del producto",false); return; }
@@ -509,19 +576,77 @@ async function clearHistCloud(){
   }catch(e){ msg("No se pudo borrar el historial en la nube", false); }
 }
 
+/* ===== Datos bancarios ===== */
+function fillBankForm(){
+  $('bankBanco').value = state.bank.banco || '';
+  $('bankBenef').value = state.bank.beneficiario || '';
+  $('bankClabe').value = state.bank.clabe || '';
+  $('bankCuenta').value = state.bank.cuenta || '';
+  $('bankRef').value = state.bank.referencia || '';
+}
+function renderBankInPrint(){
+  const b = state.bank;
+  const fmtClabe = (b.clabe||'').replace(/\s+/g,'').replace(/(\d{4})(?=\d)/g,'$1 ');
+  const lines = [];
+  if(b.banco) lines.push(`<b>Banco:</b> ${b.banco}`);
+  if(b.beneficiario) lines.push(`<b>Beneficiario:</b> ${b.beneficiario}`);
+  if(b.clabe) lines.push(`<b>CLABE:</b> ${fmtClabe}`);
+  if(b.cuenta) lines.push(`<b>Cuenta:</b> ${b.cuenta}`);
+  if(b.referencia) lines.push(`<b>Referencia:</b> ${b.referencia}`);
+  $('bankRender').innerHTML = lines.length ? lines.map(l=>`<div>${l}</div>`).join('') : '<span class="muted">Configura tus datos en la tarjeta “Datos bancarios”.</span>';
+}
+async function saveBankFromForm(){
+  state.bank = {
+    banco: $('bankBanco').value.trim(),
+    beneficiario: $('bankBenef').value.trim(),
+    clabe: $('bankClabe').value.trim(),
+    cuenta: $('bankCuenta').value.trim(),
+    referencia: $('bankRef').value.trim()
+  };
+  saveBankLocal();
+  renderBankInPrint();
+  $('bankStatus').textContent = 'Guardado local ✅';
+  await cloudSaveBank();
+}
+
+/* ===== Exportar PDF ===== */
+async function exportPDF(){
+  const area = document.getElementById('printArea');
+  const { jsPDF } = window.jspdf;
+  const canvas = await html2canvas(area, { scale: 2, backgroundColor: "#ffffff" });
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth - 40; const imgHeight = (canvas.height * imgWidth) / canvas.width; let y = 20;
+  if (imgHeight > pageHeight - 40) {
+    let remaining = imgHeight; const fullCanvasHeight = canvas.height; const sliceHeightPx = Math.floor((pageHeight - 40) * (canvas.width / imgWidth)); let position = 0;
+    while (remaining > 0) {
+      const slice = document.createElement('canvas'); slice.width = canvas.width; slice.height = Math.min(sliceHeightPx, fullCanvasHeight - position);
+      const ctx = slice.getContext('2d'); ctx.drawImage(canvas, 0, position, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      const sliceImg = slice.toDataURL('image/jpeg', 0.95); const sliceHpt = (slice.height * imgWidth) / canvas.width;
+      pdf.addImage(sliceImg, 'JPEG', 20, y, imgWidth, sliceHpt, undefined, 'FAST');
+      position += slice.height; remaining -= sliceHpt; if (position < fullCanvasHeight) pdf.addPage();
+    }
+  } else {
+    pdf.addImage(imgData, 'JPEG', 20, y, imgWidth, imgHeight, undefined, 'FAST');
+  }
+  const folio = (document.getElementById('folio')?.textContent || 'FOLIO').trim();
+  const cliente = (document.getElementById('cliente')?.value || 'Cliente').trim();
+  const sanitize = s => s.replace(/[^\w\-]+/g,'-').slice(0,80);
+  const filename = `${sanitize(folio)}_${sanitize(cliente || 'Cliente')}.pdf`;
+  pdf.save(filename);
+}
+
 /* ===== Bootstrap ===== */
 window.addEventListener('error', e=>msg(e.message||'Error',false));
 window.addEventListener('unhandledrejection', e=>msg((e.reason&&e.reason.message)||'Error',false));
 
 (function start(){
   try{
-    try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{}
-    try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{}
-    try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{}
-
+    loadLocal();
     initUI();
     renderHistTable(state.histLocal);
-
     if(state.companyKey){ ensureAuth().then(attachCloudListeners); }
   }catch(e){ console.error(e); msg("Error al iniciar: "+e.message,false); }
 })();
