@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Notas TMP Regenerative</title>
+<title>Notas - Gilberto Morales Vargas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#00b5ad">
 <link rel="icon" href="icons/icon-192.png">
@@ -33,15 +33,15 @@
 </style>
 </head>
 <body>
-  <h1>Notas de Remisión TMP Regenerative</h1>
+  <h1>Notas de Remisión — Gilberto Morales Vargas</h1>
 
   <!-- Sincronización -->
   <div class="card no-print">
     <h3>🔄 Sincronización automática (Firebase)</h3>
     <div class="grid2">
       <div>
-        <label>Clave de empresa (ej. TMP-CHIH)</label>
-        <input id="companyKey" placeholder="Ej: TMP-CHIH">
+        <label>Clave de empresa (ej. TMP-CUU)</label>
+        <input id="companyKey" placeholder="Ej: TMP-CUU">
       </div>
       <div class="row" style="align-items:end">
         <button class="secondary" id="btnGuardarClave">Guardar clave</button>
@@ -49,7 +49,7 @@
       </div>
     </div>
     <div id="msg"></div>
-    <div class="muted" style="margin-top:6px">Con clave guardada: inicio anónimo y sincronización de <b>clientes</b>, <b>productos</b> y <b>historial</b> en automático.</div>
+    <div class="muted" style="margin-top:6px">Con clave guardada: sincroniza <b>clientes</b>, <b>productos</b> y <b>historial</b> en automático.</div>
   </div>
 
   <!-- Acciones -->
@@ -59,11 +59,11 @@
     <button class="secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
   </div>
 
-  <!-- Encabezado empresa -->
+  <!-- Encabezado -->
   <div class="card">
     <div class="between row">
       <div>
-        <h3 style="margin:0">TMP Regenerative</h3>
+        <h3 style="margin:0">Gilberto Morales Vargas</h3>
         <p style="margin:0">Chihuahua, México</p>
         <p style="margin:0">RFC: <b>MOVG850703SL4</b> · Tel: <b>614 176 5850</b></p>
         <p style="margin:0">Email: <a href="mailto:gmorales.tmp@gmail.com">gmorales.tmp@gmail.com</a></p>
@@ -142,7 +142,7 @@
     <div class="line"></div>
     <div style="overflow:auto">
       <table>
-        <thead><tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Total</th><th>Origen</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Folio</th><th>Cliente</th><th>Total</th><th>Origen</th><th>Acciones</th></tr></thead>
         <tbody id="tbodyHist"></tbody>
       </table>
     </div>
@@ -153,13 +153,12 @@
 const mxn = new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"});
 const $ = id => document.getElementById(id);
 const LS = { CLIENTES:'tmp_clientes', PRODUCTOS:'tmp_productos', FOLIO:'tmp_folio', COMPANY:'tmp_company', HIST:'tmp_hist' };
-const FOLIO_PREF = "TMP-CHIH-";
-const state = { nota:{items:[]}, clientes:[], productos:[], histLocal:[], companyKey: localStorage.getItem(LS.COMPANY)||"" };
+const state = { nota:{items:[]}, clientes:[], productos:[], histLocal:[], histMerged:[], companyKey: localStorage.getItem(LS.COMPANY)||"" };
 
 /* ===== Firebase ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, deleteDoc, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, addDoc, getDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDVBZPlMSMCnypOjexBHLLd-w7Xmd1ndn0",
@@ -189,8 +188,9 @@ function attachCloudListeners(){
   unsubC=onSnapshot(query(colClientes(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.clientes=arr; saveLocal(); renderClientes(); }});
   unsubP=onSnapshot(query(colProductos(),orderBy("nombre")),s=>{ const arr=[]; s.forEach(d=>arr.push(d.data())); if(arr.length){ state.productos=arr; saveLocal(); refreshProductSelects(); }});
   unsubH=onSnapshot(query(colHistorial(),orderBy("ts","desc"),limit(200)),s=>{
-    const cloud=[]; s.forEach(d=>cloud.push({...d.data(), origen:"Nube"}));
-    renderHistTable(mergeHist(cloud, state.histLocal));
+    const cloud=[]; s.forEach(d=>cloud.push({...d.data(), _id:d.id, origen:"Nube"}));
+    state.histMerged = mergeHist(cloud, state.histLocal);
+    renderHistTable(state.histMerged);
   });
 }
 async function cloudUpsertCliente(c){ if(state.companyKey) try{ await setDoc(doc(colClientes(),c.nombre),c);}catch{} }
@@ -214,10 +214,11 @@ function saveHistLocal(arr){ state.histLocal=arr; localStorage.setItem(LS.HIST,J
 function msg(txt, ok=true){ const m=$('msg'); m.style.display='block'; m.className= ok?'ok':'err'; m.textContent=txt; if(ok) setTimeout(()=>m.style.display='none',4000); }
 
 /* ===== UI Inicial ===== */
+function currentFolioPrefix(){ return (state.companyKey || 'TMP-CHIH') + '-'; }
 function initUI(){
   $('fecha').textContent=new Date().toLocaleDateString('es-MX');
   const folioNum=Number(localStorage.getItem(LS.FOLIO)||1);
-  $('folio').textContent=FOLIO_PREF+String(folioNum).padStart(4,'0');
+  $('folio').textContent=currentFolioPrefix()+String(folioNum).padStart(4,'0');
 
   $('companyKey').value=state.companyKey;
   renderClientes(); if(state.nota.items.length===0) addItem(); calc();
@@ -225,6 +226,10 @@ function initUI(){
   $('btnGuardarClave').onclick=async()=>{
     const key=($('companyKey').value||"").trim();
     state.companyKey=key; localStorage.setItem(LS.COMPANY,key);
+    // refrescar folio mostrado con la nueva clave
+    const num=Number(localStorage.getItem(LS.FOLIO)||1);
+    $('folio').textContent=currentFolioPrefix()+String(num).padStart(4,'0');
+
     if(!key){ $('syncStatus').textContent="Estado: sin sincronizar"; msg("Clave eliminada. Solo guardado local.",true); return; }
     await ensureAuth(); attachCloudListeners(); msg("Sincronización automática activada ✅");
   };
@@ -234,8 +239,8 @@ function initUI(){
   $('selCliente').onchange=()=>{ const v=$('selCliente').value; if(v==="") return; const c=state.clientes[Number(v)]; $('cliente').value=c?.nombre||''; $('direccion').value=c?.direccion||''; };
 
   $('btnGuardarNota').onclick=guardarNota;
-  $('btnVerHist').onclick=()=>{ const c=$('histCard'); c.style.display=c.style.display==='none'?'block':'none'; renderHistTable(mergeHist(null,state.histLocal)); };
-  $('buscarHist').oninput=()=>renderHistTable(mergeHist(null,state.histLocal));
+  $('btnVerHist').onclick=()=>{ const c=$('histCard'); c.style.display=c.style.display==='none'?'block':'none'; renderHistTable(state.histMerged.length?state.histMerged:mergeHist(null,state.histLocal)); };
+  $('buscarHist').oninput=()=>renderHistTable(state.histMerged.length?state.histMerged:mergeHist(null,state.histLocal));
 }
 
 /* ===== Clientes ===== */
@@ -277,6 +282,7 @@ async function guardarProductoDesdeFila(idx){
   if(ix<0) state.productos.unshift({nombre,precio}); else state.productos[ix]={nombre,precio};
   saveLocal(); refreshProductSelects(); await cloudUpsertProducto({nombre,precio}); msg("Producto guardado ✅");
 }
+window.guardarProductoDesdeFila = guardarProductoDesdeFila; // <<<<<< EXPUESTO PARA EVITAR EL ERROR
 
 /* ===== Ítems y totales ===== */
 function addItem(){
@@ -320,17 +326,56 @@ function calc(){
 
 /* ===== Historial ===== */
 function mergeHist(cloud, local){
-  const data = (cloud||[]).concat(local?.map(h=>({...h,origen:h.origen||"Local"}))||[]);
-  return data;
+  const L = (local||[]).map((h,i)=>({...h,_localIndex:i,origen:h.origen||"Local"}));
+  const C = (cloud||[]);
+  return [...C, ...L]; // nube primero
 }
 function renderHistTable(data){
   const term = ($('buscarHist')?.value||'').toLowerCase();
-  const rows = (data||state.histLocal)
+  const rows = (data || state.histLocal)
     .filter(h => !term || (h.folio||'').toLowerCase().includes(term) || (h.cliente||'').toLowerCase().includes(term))
-    .map(h=>`<tr><td>${h.fecha||'—'}</td><td>${h.folio||'—'}</td><td>${h.cliente||'—'}</td><td>${h.total||'—'}</td><td>${h.origen||'Local'}</td></tr>`)
+    .map(h=>{
+      const useBtn = h._id
+        ? `<button class="secondary" onclick="usarNotaNube('${h._id}')">Usar esta nota</button>`
+        : (typeof h._localIndex==='number' ? `<button class="secondary" onclick="usarNotaLocal(${h._localIndex})">Usar esta nota</button>` : '');
+      return `<tr>
+        <td>${h.fecha||'—'}</td>
+        <td>${h.folio||'—'}</td>
+        <td>${h.cliente||'—'}</td>
+        <td>${h.total||'—'}</td>
+        <td>${h.origen||'—'}</td>
+        <td>${useBtn}</td>
+      </tr>`;
+    })
     .join('');
-  $('tbodyHist').innerHTML = rows || `<tr><td colspan="5" class="muted">Sin registros.</td></tr>`;
+  $('tbodyHist').innerHTML = rows || `<tr><td colspan="6" class="muted">Sin registros.</td></tr>`;
 }
+function cargarNotaEnFormulario(h){
+  $('cliente').value = h.cliente || '';
+  $('direccion').value = h.direccion || '';
+  $('descuento').value = h.descuentoPorc || 0;
+  $('notas').value = h.notas || '';
+  state.nota.items = []; $('items').innerHTML = '';
+  (h.items||[]).forEach(it=>{
+    addItem();
+    const i = state.nota.items.length - 1;
+    $('desc-'+i).value = it.descripcion || '';
+    $('cant-'+i).value = it.cantidad || 0;
+    $('precio-'+i).value = it.precio || 0;
+    state.nota.items[i] = {descripcion:it.descripcion, cantidad:it.cantidad, precio:it.precio};
+  });
+  calc();
+  alert("Nota cargada en el formulario ✅ Edítala y guarda para generar un nuevo folio.");
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+window.usarNotaLocal = (i)=>{
+  if(i<0) return; const h = state.histLocal[i]; if(!h) return; cargarNotaEnFormulario(h);
+};
+window.usarNotaNube = async (id)=>{
+  try{ const snap = await getDoc(doc(colHistorial(), id)); if(!snap.exists()) return; const h = snap.data(); cargarNotaEnFormulario(h); }
+  catch(e){ alert("No se pudo cargar la nota de la nube"); }
+};
+
 async function guardarNota(){
   const snapshot = {
     folio: $('folio').textContent,
@@ -344,14 +389,11 @@ async function guardarNota(){
     total: $('total').textContent,
     origen: 'Local'
   };
-  // local
   const hist = JSON.parse(localStorage.getItem(LS.HIST)||"[]"); hist.unshift(snapshot); saveHistLocal(hist);
-  // nube
   await cloudAddHist(snapshot);
 
-  // nuevo folio e info
   let folioNum=Number(localStorage.getItem(LS.FOLIO)||1); folioNum++; localStorage.setItem(LS.FOLIO,folioNum);
-  alert("Nota guardada ✅ Nuevo folio: "+FOLIO_PREF+String(folioNum).padStart(4,'0'));
+  alert("Nota guardada ✅ Nuevo folio: "+currentFolioPrefix()+String(folioNum).padStart(4,'0'));
   location.reload();
 }
 
@@ -359,10 +401,21 @@ async function guardarNota(){
 window.addEventListener('error', e=>msg(e.message||'Error',false));
 window.addEventListener('unhandledrejection', e=>msg((e.reason&&e.reason.message)||'Error',false));
 
-loadLocal();               // catálogos + historial local
-initUI();                  // UI y handlers
-renderHistTable(state.histLocal);
-if(state.companyKey){ ensureAuth().then(attachCloudListeners); }
+(function start(){
+  try{
+    // Local
+    try{state.clientes=JSON.parse(localStorage.getItem(LS.CLIENTES)||"[]")}catch{}
+    try{state.productos=JSON.parse(localStorage.getItem(LS.PRODUCTOS)||"[]")}catch{}
+    try{state.histLocal=JSON.parse(localStorage.getItem(LS.HIST)||"[]")}catch{}
+
+    // UI
+    initUI();
+    renderHistTable(state.histLocal);
+
+    // Sync si hay clave
+    if(state.companyKey){ ensureAuth().then(attachCloudListeners); }
+  }catch(e){ console.error(e); msg("Error al iniciar: "+e.message,false); }
+})();
 </script>
 </body>
 </html>
